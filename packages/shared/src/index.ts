@@ -5,3 +5,4 @@ export * from './health';
 export * from './listings';
 export * from './photos';
 export * from './pricing';
+export * from './stay-price';

@@ -3,6 +3,7 @@ import type {
   ListingPhotoDto,
   PublicListing,
   PublicListingSummary,
+  StayPrice,
 } from '@staynest/shared';
 import { variantKey } from '../../platform/storage/index';
 import type { MediaStorage } from '../../platform/storage/index';
@@ -58,6 +59,7 @@ export function toPublicSummary(
   row: CatalogRow,
   photos: CatalogPhotoRow[],
   storage: MediaStorage,
+  stayPrice: StayPrice | null = null,
 ): PublicListingSummary {
   const cover = photos.find((photo) => photo.is_cover) ?? photos[0];
 
@@ -83,6 +85,7 @@ export function toPublicSummary(
     maxNights: row.max_nights,
     coverPhoto: cover ? toPhotoDto(cover, storage) : null,
     photoCount: photos.length,
+    stayPrice,
     publishedAt: required(row.published_at, 'published_at').toISOString(),
   };
 }

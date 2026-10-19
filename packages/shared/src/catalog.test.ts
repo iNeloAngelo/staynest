@@ -64,6 +64,29 @@ describe('catalogQuerySchema', () => {
     expect(parsed.amenities).toEqual([1, 2]);
   });
 
+  it('принимает даты в camelCase и snake_case', () => {
+    expect(
+      catalogQuerySchema.parse({ checkIn: '2026-12-10', checkOut: '2026-12-12' }),
+    ).toMatchObject({ checkIn: '2026-12-10', checkOut: '2026-12-12' });
+
+    expect(
+      catalogQuerySchema.parse({ check_in: '2026-12-10', check_out: '2026-12-12' }),
+    ).toMatchObject({ checkIn: '2026-12-10', checkOut: '2026-12-12' });
+  });
+
+  it('требует обе даты и правильный порядок', () => {
+    expect(() => catalogQuerySchema.parse({ checkIn: '2026-12-10' })).toThrow();
+    expect(() =>
+      catalogQuerySchema.parse({ checkIn: '2026-12-12', checkOut: '2026-12-10' }),
+    ).toThrow();
+    expect(() =>
+      catalogQuerySchema.parse({ checkIn: '2026-02-30', checkOut: '2026-03-02' }),
+    ).toThrow();
+    expect(() =>
+      catalogQuerySchema.parse({ checkIn: '2026-01-01', checkOut: '2028-01-01' }),
+    ).toThrow();
+  });
+
   it('отвергает amenity id вне smallint', () => {
     expect(() => catalogQuerySchema.parse({ amenities: '99999' })).toThrow();
   });

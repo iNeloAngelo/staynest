@@ -3,7 +3,9 @@ import type {
   CitySuggestionsQuery,
   PublicListing,
   PublicListingsResponse,
+  StayPrice,
 } from '@staynest/shared';
+import { calculateStayPrice } from '@staynest/shared';
 import type { Db, DbExecutor } from '../../platform/db/index';
 import type { MediaStorage } from '../../platform/storage/index';
 import type { CatalogCursor } from './cursor';
@@ -14,10 +16,11 @@ import {
   findPublishedListing,
   listAmenities,
   listPhotos,
+  listPriceRules,
   listPublishedListings,
   suggestCities,
 } from './repo';
-import type { CatalogPhotoRow, CatalogRow } from './repo';
+import type { CatalogPhotoRow, CatalogPriceRuleRow, CatalogRow } from './repo';
 
 export type CatalogServiceDependencies = {
   db: Db;
@@ -34,6 +37,44 @@ function groupPhotos(rows: CatalogPhotoRow[]): Map<string, CatalogPhotoRow[]> {
   }
 
   return groups;
+}
+
+function groupRules(rows: CatalogPriceRuleRow[]): Map<string, CatalogPriceRuleRow[]> {
+  const groups = new Map<string, CatalogPriceRuleRow[]>();
+
+  for (const row of rows) {
+    const list = groups.get(row.listing_id) ?? [];
+    list.push(row);
+    groups.set(row.listing_id, list);
+  }
+
+  return groups;
+}
+
+function stayPriceFor(
+  row: CatalogRow,
+  rules: CatalogPriceRuleRow[],
+  query: CatalogQuery,
+): StayPrice | null {
+  if (!query.checkIn || !query.checkOut) return null;
+
+  return calculateStayPrice({
+    checkIn: query.checkIn,
+    checkOut: query.checkOut,
+    listing: {
+      basePriceMinor: Number(row.base_price_minor ?? 0),
+      weekendPriceMinor: row.weekend_price_minor === null ? null : Number(row.weekend_price_minor),
+      cleaningFeeMinor: Number(row.cleaning_fee_minor),
+      currency: row.currency.trim(),
+    },
+    rules: rules.map((rule) => ({
+      id: rule.id,
+      dateFrom: rule.date_from,
+      dateTo: rule.date_to,
+      nightlyPriceMinor: Number(rule.nightly_price_minor),
+      priority: rule.priority,
+    })),
+  });
 }
 
 function toCursor(sort: string, row: CatalogRow, q: string | undefined): CatalogCursor {
@@ -75,6 +116,7 @@ type ResponseInput = {
   sort: string;
   storage: MediaStorage;
   photosByListing: Map<string, CatalogPhotoRow[]>;
+  rulesByListing: Map<string, CatalogPriceRuleRow[]>;
 };
 
 function responseFor({
@@ -83,13 +125,21 @@ function responseFor({
   sort,
   storage,
   photosByListing,
+  rulesByListing,
 }: ResponseInput): PublicListingsResponse {
   const hasMore = rows.length > query.limit;
   const page = hasMore ? rows.slice(0, query.limit) : rows;
   const last = page[page.length - 1];
 
   return {
-    listings: page.map((row) => toPublicSummary(row, photosByListing.get(row.id) ?? [], storage)),
+    listings: page.map((row) =>
+      toPublicSummary(
+        row,
+        photosByListing.get(row.id) ?? [],
+        storage,
+        stayPriceFor(row, rulesByListing.get(row.id) ?? [], query),
+      ),
+    ),
     nextCursor: hasMore && last ? encodeCursor(toCursor(sort, last, query.q)) : null,
   };
 }
@@ -117,7 +167,12 @@ export function createCatalogService({ db, storage }: CatalogServiceDependencies
       const cursor = decodedCursor(query, sort);
       const rows = await listPublishedListings(db.kysely, query, sort, cursor);
       const ids = rows.slice(0, query.limit).map((row) => row.id);
-      const photos = await listPhotos(db.kysely, ids);
+      const [photos, rules] = await Promise.all([
+        listPhotos(db.kysely, ids),
+        query.checkIn && query.checkOut
+          ? listPriceRules(db.kysely, ids)
+          : Promise.resolve<CatalogPriceRuleRow[]>([]),
+      ]);
 
       return responseFor({
         rows,
@@ -125,6 +180,7 @@ export function createCatalogService({ db, storage }: CatalogServiceDependencies
         sort,
         storage,
         photosByListing: groupPhotos(photos),
+        rulesByListing: groupRules(rules),
       });
     },
 

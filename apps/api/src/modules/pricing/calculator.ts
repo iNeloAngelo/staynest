@@ -1,26 +1,23 @@
-import type { Quote, QuoteGroup, QuoteNight, QuoteNightSource } from '@staynest/shared';
-import { eachNight, isWeekendNight, nightsBetween } from '@staynest/shared';
+import type {
+  Quote,
+  QuoteGroup,
+  QuoteNight,
+  StayPriceListing,
+  StayPriceRule,
+} from '@staynest/shared';
+import { choosePriceRule, eachNight, nightsBetween, priceNights } from '@staynest/shared';
 
-export type PricingListing = {
+export type PricingListing = StayPriceListing & {
   maxGuests: number;
-  basePriceMinor: number;
-  weekendPriceMinor: number | null;
   cleaningFeeMinor: number;
   minNights: number;
   maxNights: number;
   currency: string;
 };
 
-export type PricingRule = {
-  id: string;
+export type PricingRule = StayPriceRule & {
   name: string;
-  /** Первая ночь периода включительно. */
-  dateFrom: string;
-  /** Последняя ночь периода включительно. */
-  dateTo: string;
-  nightlyPriceMinor: number;
   minNights: number | null;
-  priority: number;
 };
 
 type UnavailableNight = {
@@ -57,12 +54,6 @@ export type QuoteFailure = {
 type QuoteSuccess = { ok: true; quote: Quote };
 export type QuoteResult = QuoteSuccess | QuoteFailure;
 
-type NightPrice = {
-  priceMinor: number;
-  source: QuoteNightSource;
-  rule: PricingRule | null;
-};
-
 type QuoteProblem = {
   status: 409 | 422;
   code: string;
@@ -71,40 +62,6 @@ type QuoteProblem = {
 
 function failQuote(problem: QuoteProblem): QuoteFailure {
   return { ok: false, ...problem };
-}
-
-function chooseRule(night: string, rules: PricingRule[]): PricingRule | null {
-  let winner: PricingRule | null = null;
-
-  for (const rule of rules) {
-    if (rule.dateFrom > night || rule.dateTo < night) continue;
-
-    if (
-      winner === null ||
-      rule.priority > winner.priority ||
-      (rule.priority === winner.priority && rule.dateFrom > winner.dateFrom) ||
-      (rule.priority === winner.priority &&
-        rule.dateFrom === winner.dateFrom &&
-        rule.id < winner.id)
-    ) {
-      winner = rule;
-    }
-  }
-
-  return winner;
-}
-
-function priceNight(night: string, listing: PricingListing, rules: PricingRule[]): NightPrice {
-  const rule = chooseRule(night, rules);
-  if (rule) {
-    return { priceMinor: rule.nightlyPriceMinor, source: 'seasonal', rule };
-  }
-
-  if (listing.weekendPriceMinor !== null && isWeekendNight(night)) {
-    return { priceMinor: listing.weekendPriceMinor, source: 'weekend', rule: null };
-  }
-
-  return { priceMinor: listing.basePriceMinor, source: 'base', rule: null };
 }
 
 function groupNights(nights: QuoteNight[], rules: PricingRule[]): QuoteGroup[] {
@@ -189,7 +146,7 @@ function minNightsFor(nights: string[], listing: PricingListing, rules: PricingR
   let minimum = listing.minNights;
 
   for (const night of nights) {
-    const rule = chooseRule(night, rules);
+    const rule = choosePriceRule(night, rules);
     if (rule?.minNights !== null && rule?.minNights !== undefined && rule.minNights > minimum) {
       minimum = rule.minNights;
     }
@@ -249,8 +206,12 @@ export function calculateQuote(input: QuoteInput): QuoteResult {
   const unavailable = availabilityProblem(dates, input.unavailable);
   if (unavailable) return unavailable;
 
-  const priced = dates.map((date) => ({ date, ...priceNight(date, input.listing, input.rules) }));
-  const nightly = priced.map((night) => ({
+  const nightly: QuoteNight[] = priceNights(
+    input.checkIn,
+    input.checkOut,
+    input.listing,
+    input.rules,
+  ).map((night) => ({
     date: night.date,
     priceMinor: night.priceMinor,
     source: night.source,

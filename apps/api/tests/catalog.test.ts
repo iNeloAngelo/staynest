@@ -126,6 +126,62 @@ async function catalog(
   return response.json() as PublicListingsResponse;
 }
 
+type BookingSeed = {
+  checkIn: string;
+  checkOut: string;
+  status?:
+    | 'pending'
+    | 'confirmed'
+    | 'declined'
+    | 'cancelled_by_guest'
+    | 'cancelled_by_host'
+    | 'expired'
+    | 'completed';
+};
+
+async function seedBooking(h: Harness, listingId: string, options: BookingSeed): Promise<void> {
+  await h.db.pool.query(
+    `INSERT INTO bookings (
+       listing_id, guest_id, stay_range, guests_count, status,
+       total_minor, currency, price_breakdown
+     )
+     VALUES ($1, $2, daterange($3::date, $4::date, '[)'), 2, $5::booking_status, 0, 'RUB', '{}'::jsonb)`,
+    [listingId, OWNER, options.checkIn, options.checkOut, options.status ?? 'confirmed'],
+  );
+}
+
+async function seedBlock(
+  h: Harness,
+  listingId: string,
+  dateFrom: string,
+  dateTo: string,
+): Promise<void> {
+  await h.db.pool.query(
+    `INSERT INTO listing_blocks (listing_id, block_range, reason)
+     VALUES ($1, daterange($2::date, $3::date, '[)'), 'Тест')`,
+    [listingId, dateFrom, dateTo],
+  );
+}
+
+async function seedRule(
+  h: Harness,
+  listingId: string,
+  input: {
+    dateFrom: string;
+    dateTo: string;
+    nightlyPriceMinor: number;
+    priority?: number;
+  },
+): Promise<void> {
+  await h.db.pool.query(
+    `INSERT INTO listing_price_rules (
+       listing_id, name, date_from, date_to, nightly_price_minor, priority
+     )
+     VALUES ($1, 'Тест', $2::date, $3::date, $4, $5)`,
+    [listingId, input.dateFrom, input.dateTo, input.nightlyPriceMinor, input.priority ?? 0],
+  );
+}
+
 function sorted(values: string[]): string[] {
   return [...values].sort();
 }
@@ -437,6 +493,207 @@ describeDatabase('catalog API', () => {
     });
 
     expect(response.statusCode).toBe(422);
+  });
+
+  it('скрывает дома с активными бронями и возвращает освободившиеся даты', async () => {
+    const pending = await seedListing(h, { title: 'Pending' });
+    const confirmed = await seedListing(h, { title: 'Confirmed' });
+    const declined = await seedListing(h, { title: 'Declined' });
+    const cancelled = await seedListing(h, { title: 'Cancelled' });
+    const cancelledByHost = await seedListing(h, { title: 'Cancelled by host' });
+    const expired = await seedListing(h, { title: 'Expired' });
+    const completed = await seedListing(h, { title: 'Completed' });
+
+    await seedBooking(h, pending, {
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
+      status: 'pending',
+    });
+    await seedBooking(h, confirmed, {
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
+      status: 'confirmed',
+    });
+    await seedBooking(h, declined, {
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
+      status: 'declined',
+    });
+    await seedBooking(h, cancelled, {
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
+      status: 'cancelled_by_guest',
+    });
+    await seedBooking(h, cancelledByHost, {
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
+      status: 'cancelled_by_host',
+    });
+    await seedBooking(h, expired, {
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
+      status: 'expired',
+    });
+    await seedBooking(h, completed, {
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
+      status: 'completed',
+    });
+
+    const body = await catalog(h, { check_in: '2026-12-10', check_out: '2026-12-12' });
+
+    expect(sorted(ids(body))).toEqual(
+      sorted([declined, cancelled, cancelledByHost, expired, completed]),
+    );
+  });
+
+  it('разрешает смежные даты и учитывает блокировки хозяина', async () => {
+    const booked = await seedListing(h, { title: 'С бронью' });
+    const blocked = await seedListing(h, { title: 'С блокировкой' });
+    const partial = await seedListing(h, { title: 'Частичное пересечение' });
+    await seedBooking(h, booked, { checkIn: '2026-12-10', checkOut: '2026-12-12' });
+    await seedBooking(h, partial, { checkIn: '2026-12-09', checkOut: '2026-12-11' });
+    await seedBlock(h, blocked, '2026-12-10', '2026-12-12');
+
+    const same = await catalog(h, { checkIn: '2026-12-10', checkOut: '2026-12-12' });
+    expect(ids(same)).toEqual([]);
+
+    const afterPartial = await catalog(h, { checkIn: '2026-12-11', checkOut: '2026-12-12' });
+    expect(ids(afterPartial)).toContain(partial);
+
+    const afterBooking = await catalog(h, { checkIn: '2026-12-12', checkOut: '2026-12-14' });
+    expect(sorted(ids(afterBooking))).toEqual(sorted([booked, blocked, partial]));
+
+    const beforeBooking = await catalog(h, { checkIn: '2026-12-08', checkOut: '2026-12-10' });
+    expect(sorted(ids(beforeBooking))).toEqual(sorted([booked, blocked]));
+
+    const beforeBlock = await catalog(h, { checkIn: '2026-12-08', checkOut: '2026-12-10' });
+    expect(ids(beforeBlock)).toContain(blocked);
+
+    const afterBlock = await catalog(h, { checkIn: '2026-12-12', checkOut: '2026-12-14' });
+    expect(ids(afterBlock)).toContain(blocked);
+  });
+
+  it('считает стоимость за период и совпадает с /quote', async () => {
+    const id = await seedListing(h, {
+      title: 'Дом с сезоном',
+      basePriceMinor: 100_000,
+      weekendPriceMinor: 150_000,
+      cleaningFeeMinor: 50_000,
+      minNights: 1,
+      maxNights: 30,
+    });
+    await seedRule(h, id, {
+      dateFrom: '2026-12-11',
+      dateTo: '2026-12-11',
+      nightlyPriceMinor: 200_000,
+      priority: 1,
+    });
+
+    const body = await catalog(h, { check_in: '2026-12-10', check_out: '2026-12-14' });
+    const listing = body.listings.find((item) => item.id === id);
+
+    expect(listing?.stayPrice).toMatchObject({
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-14',
+      nights: 4,
+      nightlyTotalMinor: 550_000,
+      cleaningFeeMinor: 50_000,
+      totalMinor: 600_000,
+      currency: 'RUB',
+    });
+
+    const quoteResponse = await h.app.inject({
+      method: 'GET',
+      url: `/api/v1/listings/${id}/quote?check_in=2026-12-10&check_out=2026-12-14&guests=2`,
+    });
+    const { quote } = quoteResponse.json() as { quote: { totalMinor: number } };
+    expect(quote.totalMinor).toBe(listing?.stayPrice?.totalMinor);
+  });
+
+  it('без дат не считает период и возвращает null', async () => {
+    await seedListing(h);
+    const body = await catalog(h);
+
+    expect(body.listings[0]?.stayPrice).toBeNull();
+  });
+
+  it('отдаёт 422 на неполные, неверные и слишком длинные даты', async () => {
+    const cases = [
+      'check_in=2026-12-10',
+      'check_out=2026-12-10',
+      'check_in=2026-12-12&check_out=2026-12-10',
+      'check_in=2026-02-30&check_out=2026-03-02',
+      'check_in=2026-12-10&check_out=2028-12-10',
+    ];
+
+    for (const query of cases) {
+      const response = await h.app.inject({
+        method: 'GET',
+        url: `/api/v1/listings?${query}`,
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.headers['content-type']).toContain('application/problem+json');
+    }
+  });
+
+  it('пагинация с датами не теряет и не повторяет дома', async () => {
+    const available: string[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      const id = await seedListing(h, {
+        title: `Свободный ${index}`,
+        basePriceMinor: 500_000,
+      });
+      available.push(id);
+    }
+    const busy = await seedListing(h, { title: 'Занятый', basePriceMinor: 500_000 });
+    await seedBooking(h, busy, { checkIn: '2026-12-10', checkOut: '2026-12-12' });
+
+    const seen: string[] = [];
+    let cursor: string | null = null;
+
+    do {
+      const body = await catalog(h, {
+        check_in: '2026-12-10',
+        check_out: '2026-12-12',
+        sort: 'price_asc',
+        limit: 2,
+        cursor: cursor ?? undefined,
+      });
+      seen.push(...ids(body));
+      cursor = body.nextCursor;
+    } while (cursor);
+
+    expect(seen).toHaveLength(5);
+    expect(new Set(seen).size).toBe(5);
+    expect(sorted(seen)).toEqual(sorted(available));
+  });
+
+  it('пагинация релевантности с датами не теряет строки', async () => {
+    for (let index = 0; index < 4; index += 1) {
+      await seedListing(h, { title: `Дом у озера ${index}` });
+    }
+    const busy = await seedListing(h, { title: 'Дом у озера занятый' });
+    await seedBooking(h, busy, { checkIn: '2026-12-10', checkOut: '2026-12-12' });
+
+    const seen: string[] = [];
+    let cursor: string | null = null;
+
+    do {
+      const body = await catalog(h, {
+        q: 'озеро',
+        check_in: '2026-12-10',
+        check_out: '2026-12-12',
+        limit: 2,
+        cursor: cursor ?? undefined,
+      });
+      seen.push(...ids(body));
+      cursor = body.nextCursor;
+    } while (cursor);
+
+    expect(seen).toHaveLength(4);
+    expect(new Set(seen).size).toBe(4);
+    expect(seen).not.toContain(busy);
   });
 
   it('отдаёт карточку дома без адреса и точных координат', async () => {

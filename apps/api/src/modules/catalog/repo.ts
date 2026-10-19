@@ -1,9 +1,14 @@
 import { sql } from 'kysely';
-import type { Selectable, SelectQueryBuilder } from 'kysely';
+import type { QueryCreator, Selectable, SelectQueryBuilder } from 'kysely';
 import type { CatalogQuery } from '@staynest/shared';
 import type { DbExecutor } from '../../platform/db/index';
 import type { DB } from '../../platform/db/schema.generated';
-import type { Amenities, ListingPhotos, Listings } from '../../platform/db/schema.generated';
+import type {
+  Amenities,
+  ListingPhotos,
+  ListingPriceRules,
+  Listings,
+} from '../../platform/db/schema.generated';
 import type { CatalogCursor } from './cursor';
 
 export type CatalogRow = Selectable<Listings> & {
@@ -13,8 +18,11 @@ export type CatalogRow = Selectable<Listings> & {
 };
 export type CatalogPhotoRow = Selectable<ListingPhotos>;
 export type CatalogAmenityRow = Selectable<Amenities> & { listing_id: string };
+export type CatalogPriceRuleRow = Selectable<ListingPriceRules>;
 
-type CatalogBuilder = SelectQueryBuilder<DB, 'listings', CatalogRow>;
+/** Контекст запроса каталога: к таблицам добавлен материализованный `busy`. */
+type CatalogDb = DB & { busy: { listing_id: string } };
+type CatalogBuilder = SelectQueryBuilder<CatalogDb, 'listings', CatalogRow>;
 
 function likePattern(value: string): string {
   return `%${value.replace(/[\\%_]/g, '\\$&')}%`;
@@ -33,7 +41,51 @@ function rankExpression(q: string) {
   return sql<number>`ts_rank_cd(listings.search_tsv, websearch_to_tsquery('russian', ${q}))::float8`;
 }
 
-function filterQuery(query: CatalogBuilder, filters: CatalogQuery): CatalogBuilder {
+/**
+ * Материализованный набор занятых домов. Без него планировщик иногда выбирает
+ * nested loop anti join и сортирует все совпадения по `q` (до 10 000 строк).
+ * Хеш-анти-джойн с готовым `busy` стабильно отсекает занятые дома до сортировки.
+ */
+function busyListings(db: QueryCreator<DB>, filters: CatalogQuery) {
+  if (!filters.checkIn || !filters.checkOut) {
+    return db
+      .selectFrom('bookings')
+      .select('listing_id')
+      .where(sql<boolean>`false`);
+  }
+
+  const range = sql<boolean>`daterange(${filters.checkIn}::date, ${filters.checkOut}::date, '[)')`;
+  const booked = db
+    .selectFrom('bookings')
+    .select('listing_id')
+    .where('status', 'in', ['pending', 'confirmed'])
+    .where(sql<boolean>`stay_range && ${range}`);
+  const blocked = db
+    .selectFrom('listing_blocks')
+    .select('listing_id')
+    .where(sql<boolean>`block_range && ${range}`);
+
+  return booked.union(blocked);
+}
+
+/** Все запросы каталога видят `busy`; при отсутствии дат CTE пустая. */
+function withAvailability(executor: DbExecutor, filters: CatalogQuery) {
+  return executor.with(
+    (cte) => cte('busy').materialized(),
+    (db) => busyListings(db, filters),
+  );
+}
+
+function availabilityConditions(filters: CatalogQuery): Array<ReturnType<typeof sql<boolean>>> {
+  if (!filters.checkIn || !filters.checkOut) return [];
+
+  return [sql<boolean>`NOT EXISTS (SELECT 1 FROM busy WHERE busy.listing_id = listings.id)`];
+}
+
+function filterQuery<O>(
+  query: SelectQueryBuilder<CatalogDb, 'listings', O>,
+  filters: CatalogQuery,
+): SelectQueryBuilder<CatalogDb, 'listings', O> {
   const conditions: Array<ReturnType<typeof sql<boolean>>> = [];
 
   if (filters.q) {
@@ -44,6 +96,9 @@ function filterQuery(query: CatalogBuilder, filters: CatalogQuery): CatalogBuild
   }
 
   if (filters.city) conditions.push(sql<boolean>`lower(listings.city) = lower(${filters.city})`);
+
+  conditions.push(...availabilityConditions(filters));
+
   if (filters.guests !== undefined) {
     conditions.push(sql<boolean>`listings.max_guests >= ${filters.guests}`);
   }
@@ -81,7 +136,10 @@ function filterQuery(query: CatalogBuilder, filters: CatalogQuery): CatalogBuild
   return conditions.reduce((builder, condition) => builder.where(condition), query);
 }
 
-function applyCursor(query: CatalogBuilder, cursor: CatalogCursor): CatalogBuilder {
+function applyCursor<O>(
+  query: SelectQueryBuilder<CatalogDb, 'listings', O>,
+  cursor: CatalogCursor,
+): SelectQueryBuilder<CatalogDb, 'listings', O> {
   if (cursor.sort === 'price_asc') {
     return query.where(
       sql<boolean>`(listings.base_price_minor, listings.id) > (${cursor.price}::bigint, ${cursor.id}::uuid)`,
@@ -108,7 +166,11 @@ function applyCursor(query: CatalogBuilder, cursor: CatalogCursor): CatalogBuild
   )`);
 }
 
-function orderBy(query: CatalogBuilder, sort: string, q: string | undefined): CatalogBuilder {
+function orderBy<O>(
+  query: SelectQueryBuilder<CatalogDb, 'listings', O>,
+  sort: string,
+  q: string | undefined,
+): SelectQueryBuilder<CatalogDb, 'listings', O> {
   if (sort === 'price_asc') {
     return query.orderBy('listings.base_price_minor', 'asc').orderBy('listings.id', 'asc');
   }
@@ -133,10 +195,12 @@ export function listPublishedListings(
   sort: string,
   cursor: CatalogCursor | null,
 ): Promise<CatalogRow[]> {
+  if (sort === 'relevance') return listByRelevance(executor, filters, cursor);
+
   const rank =
     sort === 'relevance' && filters.q ? rankExpression(filters.q) : sql<number>`0::float8`;
 
-  let query: CatalogBuilder = executor
+  let query: CatalogBuilder = withAvailability(executor, filters)
     .selectFrom('listings')
     .selectAll('listings')
     .select(rank.as('rank'))
@@ -149,6 +213,53 @@ export function listPublishedListings(
   query = orderBy(query, sort, filters.q);
 
   return query.limit(filters.limit + 1).execute() as Promise<CatalogRow[]>;
+}
+
+/**
+ * Релевантность: сначала сортируем только `(rank, published_at, id)` на
+ * индексе/скане, затем подтягиваем полные строки для одной страницы.
+ * Если сортировать сразу всю ширину объявления, 10 000 совпадений по `q`
+ * дают seq scan и сортировку ~8 МБ — заметно дороже лимита кадра.
+ */
+async function listByRelevance(
+  executor: DbExecutor,
+  filters: CatalogQuery,
+  cursor: CatalogCursor | null,
+): Promise<CatalogRow[]> {
+  const rank = rankExpression(filters.q ?? '');
+
+  let ranked: SelectQueryBuilder<
+    CatalogDb,
+    'listings',
+    { id: string; rank: number; published_at_precise: string }
+  > = withAvailability(executor, filters)
+    .selectFrom('listings')
+    .select(['listings.id', rank.as('rank'), publishedAtPrecise().as('published_at_precise')])
+    .where('listings.status', '=', 'published')
+    .where('listings.published_at', 'is not', null);
+
+  ranked = filterQuery(ranked, filters);
+  if (cursor) ranked = applyCursor(ranked, cursor);
+
+  const rows = await executor
+    .selectFrom(
+      ranked
+        .orderBy(rank, 'desc')
+        .orderBy('listings.published_at', 'desc')
+        .orderBy('listings.id', 'desc')
+        .limit(filters.limit + 1)
+        .as('ranked'),
+    )
+    .innerJoin('listings', 'listings.id', 'ranked.id')
+    .selectAll('listings')
+    .select('ranked.rank')
+    .select('ranked.published_at_precise')
+    .orderBy('ranked.rank', 'desc')
+    .orderBy('listings.published_at', 'desc')
+    .orderBy('listings.id', 'desc')
+    .execute();
+
+  return rows as CatalogRow[];
 }
 
 export async function findPublishedListing(
@@ -194,6 +305,23 @@ export function listAmenities(
     .where('listing_amenities.listing_id', 'in', listingIds)
     .orderBy('amenities.sort_order', 'asc')
     .orderBy('amenities.id', 'asc')
+    .execute();
+}
+
+/** Read-only взгляд каталога в правила цен (ADR-017): нужен итог за период. */
+export function listPriceRules(
+  executor: DbExecutor,
+  listingIds: string[],
+): Promise<CatalogPriceRuleRow[]> {
+  if (listingIds.length === 0) return Promise.resolve([]);
+
+  return executor
+    .selectFrom('listing_price_rules')
+    .selectAll()
+    .where('listing_id', 'in', listingIds)
+    .orderBy('date_from', 'asc')
+    .orderBy('priority', 'desc')
+    .orderBy('id', 'asc')
     .execute();
 }
 

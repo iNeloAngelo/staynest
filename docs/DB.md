@@ -17,6 +17,7 @@ PostgreSQL 16. Источник правды: SQL-миграции в `db/migrat
 | `0005_bookings_and_audit` | `bookings` с EXCLUDE, `booking_events`, `idempotency_keys` |
 | `0006_availability_and_misc` | блокировки и цены, Telegram, избранное, уведомления, push, платежи, отзывы |
 | `0007_listing_drafts` | незаполненные черновики объявлений: nullable-поля и CHECK полноты для `published`/`archived` |
+| `0008_catalog_search_indexes` | функциональные индексы по `lower(city)` под поиск и сортировку каталога |
 
 ```bash
 pnpm db:reset        # пересоздать базу разработки: drop schema, миграции, сид
@@ -293,12 +294,17 @@ CREATE TRIGGER listings_set_updated_at BEFORE UPDATE ON listings
 
 -- Индексы для каталога
 CREATE INDEX listings_owner_idx        ON listings (owner_id);
-CREATE INDEX listings_pub_city_price_idx ON listings (city, base_price_minor) WHERE status = 'published';
+CREATE INDEX listings_pub_city_lower_price_idx
+  ON listings (lower(city), base_price_minor) WHERE status = 'published';
+CREATE INDEX listings_pub_city_lower_newest_idx
+  ON listings (lower(city), published_at DESC, id DESC) WHERE status = 'published';
 CREATE INDEX listings_pub_newest_idx   ON listings (published_at DESC, id DESC) WHERE status = 'published';
 CREATE INDEX listings_pub_price_idx    ON listings (base_price_minor, id) WHERE status = 'published';
 CREATE INDEX listings_search_tsv_idx   ON listings USING gin (search_tsv);
 CREATE INDEX listings_city_trgm_idx    ON listings USING gin (city gin_trgm_ops);
 ```
+
+Функциональные индексы `listings_pub_city_lower_*` появились в миграции `0008`: фильтр каталога сравнивает `lower(city)`, поэтому обычный индекс по `city` планировщик не использовал. Поиск по свободным датам опирается на gist-индексы EXCLUDE-ограничений `bookings_no_overlap` и `listing_blocks_no_overlap` — отдельных индексов не требуется (см. `docs/perf/search.md`).
 
 Примечание: `cover_photo_id` получает внешний ключ на `listing_photos(id)` в той же миграции `0004` после создания `listing_photos` (циклическая зависимость), `ON DELETE SET NULL`.
 

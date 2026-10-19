@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import { nightsBetween } from './dates';
 import { amenityDtoSchema, listingTypeSchema } from './listings';
 import { listingPhotoDtoSchema } from './photos';
+import { isoDateSchema, MAX_QUOTE_NIGHTS } from './pricing';
+import { stayPriceSchema } from './stay-price';
 
 export const CATALOG_DEFAULT_LIMIT = 24;
 export const CATALOG_MAX_LIMIT = 48;
@@ -34,6 +37,8 @@ const QUERY_ALIASES: Record<string, string> = {
   price_min: 'priceMin',
   price_max: 'priceMax',
   bedrooms_min: 'bedroomsMin',
+  check_in: 'checkIn',
+  check_out: 'checkOut',
   'type[]': 'type',
   'amenities[]': 'amenities',
 };
@@ -59,19 +64,47 @@ const optionalText = (max: number) =>
 
 export const catalogQuerySchema = z.preprocess(
   normalizeQuery,
-  z.object({
-    q: optionalText(120),
-    city: optionalText(120),
-    guests: z.coerce.number().int().min(1).max(30).optional(),
-    priceMin: z.coerce.number().int().min(0).max(100_000_000_000).optional(),
-    priceMax: z.coerce.number().int().min(0).max(100_000_000_000).optional(),
-    bedroomsMin: z.coerce.number().int().min(0).max(20).optional(),
-    type: csvList(listingTypeSchema, 5),
-    amenities: csvList(z.coerce.number().int().positive().max(32_767), 20),
-    sort: catalogSortSchema.optional(),
-    cursor: z.string().min(1).max(1024).optional(),
-    limit: z.coerce.number().int().min(1).max(CATALOG_MAX_LIMIT).default(CATALOG_DEFAULT_LIMIT),
-  }),
+  z
+    .object({
+      q: optionalText(120),
+      city: optionalText(120),
+      checkIn: isoDateSchema.optional(),
+      checkOut: isoDateSchema.optional(),
+      guests: z.coerce.number().int().min(1).max(30).optional(),
+      priceMin: z.coerce.number().int().min(0).max(100_000_000_000).optional(),
+      priceMax: z.coerce.number().int().min(0).max(100_000_000_000).optional(),
+      bedroomsMin: z.coerce.number().int().min(0).max(20).optional(),
+      type: csvList(listingTypeSchema, 5),
+      amenities: csvList(z.coerce.number().int().positive().max(32_767), 20),
+      sort: catalogSortSchema.optional(),
+      cursor: z.string().min(1).max(1024).optional(),
+      limit: z.coerce.number().int().min(1).max(CATALOG_MAX_LIMIT).default(CATALOG_DEFAULT_LIMIT),
+    })
+    .refine((value) => (value.checkIn === undefined) === (value.checkOut === undefined), {
+      path: ['checkIn'],
+      message: 'Для поиска по датам укажите и заезд, и выезд.',
+    })
+    .refine(
+      (value) =>
+        value.checkIn === undefined ||
+        value.checkOut === undefined ||
+        value.checkOut > value.checkIn,
+      {
+        path: ['checkOut'],
+        message: 'Дата выезда должна быть позже даты заезда.',
+      },
+    )
+    .refine(
+      (value) =>
+        value.checkIn === undefined ||
+        value.checkOut === undefined ||
+        value.checkOut <= value.checkIn ||
+        nightsBetween(value.checkIn, value.checkOut) <= MAX_QUOTE_NIGHTS,
+      {
+        path: ['checkOut'],
+        message: `Максимальный срок поиска — ${MAX_QUOTE_NIGHTS} ночей.`,
+      },
+    ),
 );
 
 export const citySuggestionsQuerySchema = z.object({
@@ -110,6 +143,8 @@ export const publicListingSummarySchema = z.object({
   maxNights: z.number().int(),
   coverPhoto: listingPhotoDtoSchema.nullable(),
   photoCount: z.number().int(),
+  /** Итог за выбранный период; `null`, если даты не переданы. */
+  stayPrice: stayPriceSchema.nullable(),
   publishedAt: z.iso.datetime(),
 });
 
