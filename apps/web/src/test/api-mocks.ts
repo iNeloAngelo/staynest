@@ -1,4 +1,4 @@
-import type { ListingDto, UserDto } from '@staynest/shared';
+import type { ListingDto, ListingPhotoDto, UserDto } from '@staynest/shared';
 import { vi } from 'vitest';
 
 export const demoUser: UserDto = {
@@ -39,11 +39,26 @@ export const demoListing: ListingDto = {
   checkOutTime: '11:00',
   houseRules: null,
   coverPhotoId: null,
+  photos: [],
   amenities: [],
   pendingBookingsCount: 0,
   createdAt: '2026-10-19T10:00:00.000Z',
   updatedAt: '2026-10-19T10:00:00.000Z',
   publishedAt: null,
+};
+
+export const demoPhoto: ListingPhotoDto = {
+  id: '5b7c6f6e-1a2b-4c3d-8e9f-0a1b2c3d4e5f',
+  width: 1000,
+  height: 750,
+  blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+  position: 0,
+  isCover: true,
+  urls: {
+    thumb: '/media/listings/demo/thumb.webp',
+    md: '/media/listings/demo/md.webp',
+    lg: '/media/listings/demo/lg.webp',
+  },
 };
 
 const demoAmenities = [

@@ -11,6 +11,7 @@ export function MyListingCard({ listing }: { listing: ListingDto }) {
   const { t } = useTranslation();
   const { locale } = useLocale();
   const title = listing.title?.trim() || t('listings.untitled');
+  const cover = listing.photos.find((photo) => photo.isCover) ?? listing.photos[0];
 
   return (
     <Link
@@ -18,7 +19,18 @@ export function MyListingCard({ listing }: { listing: ListingDto }) {
       className="flex gap-3 rounded-lg border border-border bg-surface p-3 shadow-sm transition-colors duration-micro hover:border-primary sm:gap-4 sm:p-4"
     >
       <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-2 text-ink-muted sm:size-24">
-        <House className="size-8" aria-hidden="true" strokeWidth={1.5} />
+        {cover ? (
+          <img
+            src={cover.urls.thumb}
+            alt=""
+            width={cover.width}
+            height={cover.height}
+            loading="lazy"
+            className="size-full object-cover"
+          />
+        ) : (
+          <House className="size-8" aria-hidden="true" strokeWidth={1.5} />
+        )}
       </span>
 
       <span className="flex min-w-0 flex-1 flex-col gap-1.5">

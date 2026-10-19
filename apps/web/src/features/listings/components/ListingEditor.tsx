@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useOnline } from '../../../shared/lib/useOnline';
 import { Button, Modal } from '../../../shared/ui';
+import { PhotoUploader } from '../../photo-uploader';
 import {
   ListingBasicsSection,
   ListingCapacitySection,
@@ -167,6 +168,7 @@ function ListingEditorForm({
       <ListingLocationSection {...sectionProps} />
       <ListingCapacitySection {...sectionProps} />
       <ListingStaySection {...sectionProps} />
+      <PhotoUploader listingId={listing.id} photos={listing.photos} />
       <ListingPriceSection {...sectionProps} />
       <ListingAmenitiesSection {...sectionProps} />
       <ListingRulesSection {...sectionProps} />

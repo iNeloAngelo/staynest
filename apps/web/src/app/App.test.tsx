@@ -283,7 +283,7 @@ describe('App', () => {
     mockApi({ user: demoUser, listings: [{ ...demoListing, title: 'Дом у озера' }] });
     renderApp([`/host/listings/${demoListing.id}`]);
 
-    expect(await screen.findByText(/Нет сети/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Нет сети/)).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Опубликовать' })).toBeDisabled();
   });
