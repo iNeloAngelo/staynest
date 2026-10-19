@@ -13,6 +13,16 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+if grep -qE '^JWT_SECRET=(|dev-only-)' .env; then
+  echo "Задайте случайный JWT_SECRET в .env: openssl rand -base64 48" >&2
+  exit 1
+fi
+
+if grep -qE '^(CORS_ORIGINS|APP_WEB_URL)=.*(localhost|127\.0\.0\.1)' .env; then
+  echo "CORS_ORIGINS и APP_WEB_URL в production не должны содержать localhost." >&2
+  exit 1
+fi
+
 echo "== git pull =="
 git pull --ff-only
 

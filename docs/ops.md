@@ -150,7 +150,8 @@ mkdir -p /opt/staynest && chown deploy:deploy /opt/staynest
 Стенд уже работает: `https://olivertwist95.clodocd.com`. Код лежит в `/opt/staynest`, вход по SSH-ключу пользователем `deploy`, доступ к GitHub — через read-only deploy key (`~deploy/.ssh/github_deploy`), к Docker — через группу `docker`.
 
 1. Код на сервере: `git pull --ff-only` в `/opt/staynest`.
-2. `.env` лежит рядом с репозиторием (права `600`, владелец `deploy`): `NODE_ENV=production`, `TRUST_PROXY=true`, `DOMAIN`, `DATABASE_URL` с хостом `postgres`, `CORS_ORIGINS` с HTTPS-доменом. API и S3 наружу не публикуются.
+2. `.env` лежит рядом с репозиторием (права `600`, владелец `deploy`): `NODE_ENV=production`, `TRUST_PROXY=true`, `DOMAIN`, `DATABASE_URL` с хостом `postgres`, `CORS_ORIGINS` с HTTPS-доменом, `JWT_SECRET` (не короче 32 символов), `SMTP_HOST` (в compose это `mailpit`), `SMTP_PORT=1025`, `APP_WEB_URL` с HTTPS-доменом. API и S3 наружу не публикуются.
+   В production API не стартует без `JWT_SECRET`, `SMTP_HOST`, `DATABASE_URL`, `CORS_ORIGINS`, `APP_WEB_URL` и при `REQUIRE_EMAIL_VERIFICATION=false`. Перед первым деплоем Сессии 3 добавьте `JWT_SECRET` в `/opt/staynest/.env`: `openssl rand -base64 48`.
 3. Сборка образов, миграции **отдельной командой**, затем `docker compose up -d`.
 4. Проверка: `/health` отвечает `ok` с `db: up`, сайт по HTTPS, демо-сценарий.
 5. Бэкап-джоб и проверенное восстановление — в Сессии 17, до объявления деплоя полностью готовым.

@@ -17,6 +17,9 @@ function parseDateAsString(value: string): string {
 
 type AppDatabase = Kysely<DB>;
 
+/** Исполнитель запроса: обычное соединение или транзакция (`Transaction extends Kysely`). */
+export type DbExecutor = Kysely<DB>;
+
 export type Db = {
   pool: Pool;
   kysely: AppDatabase;

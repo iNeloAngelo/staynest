@@ -1,4 +1,4 @@
-import pino, { type Logger, type LoggerOptions } from 'pino';
+import pino, { type DestinationStream, type Logger, type LoggerOptions } from 'pino';
 
 const REDACT_PATHS = [
   'req.headers.cookie',
@@ -15,6 +15,16 @@ const REDACT_PATHS = [
   '*.access_token',
   '*.refresh_token',
   '*.password_hash',
+  '*.newPassword',
+  '*.currentPassword',
+  '*.tokenHash',
+  '*.token_hash',
+  '*.jwtSecret',
+  '*.jwt_secret',
+  'jwtSecret',
+  'jwt_secret',
+  'passwordHash',
+  'tokenHash',
   '*.secret',
   '*.*.password',
   '*.*.token',
@@ -24,7 +34,11 @@ const REDACT_PATHS = [
   '*.phone',
 ];
 
-export function createLogger(level: string, pretty: boolean): Logger {
+export function createLogger(
+  level: string,
+  pretty: boolean,
+  destination?: DestinationStream,
+): Logger {
   const options: LoggerOptions = {
     level,
     redact: {
@@ -32,6 +46,8 @@ export function createLogger(level: string, pretty: boolean): Logger {
       censor: '[redacted]',
     },
   };
+
+  if (destination) return pino(options, destination);
 
   if (pretty) {
     options.transport = {

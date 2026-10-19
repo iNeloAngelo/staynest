@@ -5,3 +5,4 @@ node_modules/
 pnpm-lock.yaml
 *.md
 apps/api/src/platform/db/schema.generated.ts
+apps/api/src/modules/auth/data/common-passwords.generated.ts

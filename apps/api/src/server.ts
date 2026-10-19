@@ -2,14 +2,18 @@ import { buildApp } from './app';
 import { loadConfig } from './platform/config/index';
 import { createDb } from './platform/db/index';
 import { errorCode } from './platform/errors/code';
+import { createEventBus } from './platform/events/index';
 import { createLogger } from './platform/logger/index';
+import { createMailer } from './platform/mailer/index';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel, config.nodeEnv === 'development');
 const db = createDb(config.databaseUrl, logger, config.dbQueryTimeoutMs);
-const app = await buildApp({ config, logger, db });
+const mailer = createMailer(config.mail, logger);
+const events = createEventBus(logger);
+const app = await buildApp({ config, logger, db, mailer, events });
 
 let shuttingDown = false;
 

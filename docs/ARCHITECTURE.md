@@ -103,7 +103,7 @@ apps/web/src/
 
 | Событие | Публикует | Подписаны |
 |---|---|---|
-| `user.registered` | `auth` | `notifications` (письмо подтверждения через `mailer`) |
+| `user.registered` | `auth` | пока никто; письмо подтверждения `auth` отправляет сам через `mailer` |
 | `booking.requested` | `bookings` | `notifications` (хозяину) |
 | `booking.confirmed` / `booking.declined` | `bookings` | `notifications` (гостю) |
 | `booking.cancelled` | `bookings` | `notifications` (второй стороне) |

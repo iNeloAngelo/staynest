@@ -33,6 +33,12 @@ services:
     env_file: ../.env
     environment:
       NODE_ENV: production
+      # API доступен только через Caddy: доверяем X-Forwarded-For для request.ip.
+      TRUST_PROXY: 'true'
+      # В staging почта всегда идёт в Mailpit контейнера, а ссылки — на публичный домен.
+      SMTP_HOST: mailpit
+      SMTP_PORT: '1025'
+      APP_WEB_URL: https://${DOMAIN:?DOMAIN is required}
     expose:
       - '3100'
     depends_on:

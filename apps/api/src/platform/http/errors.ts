@@ -15,6 +15,7 @@ type ProblemInput = {
   title: string;
   detail: string;
   errors?: unknown;
+  headers?: Record<string, string>;
 };
 
 const STATUS_META: Record<number, Omit<ProblemInput, 'status' | 'errors'>> = {
@@ -67,6 +68,10 @@ function problem({ status, code, title, detail, errors }: ProblemInput): Problem
 }
 
 function sendProblem(reply: FastifyReply, input: ProblemInput): void {
+  for (const [name, value] of Object.entries(input.headers ?? {})) {
+    reply.header(name, value);
+  }
+
   void reply
     .header('cache-control', 'no-store')
     .status(input.status)
@@ -92,6 +97,7 @@ type AppErrorInput = {
   title: string;
   detail: string;
   errors?: unknown;
+  headers?: Record<string, string>;
 };
 
 /**
@@ -104,8 +110,9 @@ export class AppError extends Error {
   readonly title: string;
   readonly detail: string;
   readonly errors?: unknown;
+  readonly headers?: Record<string, string>;
 
-  constructor({ status, code, title, detail, errors }: AppErrorInput) {
+  constructor({ status, code, title, detail, errors, headers }: AppErrorInput) {
     if (status < 400 || status > 599) {
       throw new Error('AppError.status должен быть в диапазоне 400–599');
     }
@@ -117,6 +124,7 @@ export class AppError extends Error {
     this.title = title;
     this.detail = detail;
     this.errors = errors;
+    this.headers = headers;
   }
 }
 
@@ -136,6 +144,7 @@ export function problemErrorHandler(
       title: error.title,
       detail: error.detail,
       errors: error.errors,
+      headers: error.headers,
     });
     return;
   }

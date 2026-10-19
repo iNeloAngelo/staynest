@@ -14,6 +14,15 @@ const config: AppConfig = {
   corsOrigins: ['http://localhost:5173'],
   trustProxy: false,
   dbQueryTimeoutMs: 5000,
+  webAppUrl: 'http://localhost:5173',
+  auth: {
+    jwtSecret: 'test-secret-with-at-least-32-characters',
+    accessTokenTtlSeconds: 900,
+    refreshTokenTtlDays: 30,
+    requireEmailVerification: true,
+    argon2: { memoryCost: 19_456, timeCost: 2, parallelism: 1 },
+  },
+  mail: { host: 'localhost', port: 1025, from: 'StayNest <no-reply@staynest.local>' },
 };
 
 const logger = createLogger('silent', false);

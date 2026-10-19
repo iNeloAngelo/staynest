@@ -25,6 +25,8 @@ dev-dist/
 
 # Локальные артефакты и отчёты
 *.log
+cookies.txt
+*.cookies.txt
 tmp/
 .playwright/
 test-results/
