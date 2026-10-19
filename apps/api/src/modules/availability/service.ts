@@ -10,6 +10,7 @@ import { requirePublishedListing } from '../catalog/index';
 import { requireOwnedListing } from '../listings/index';
 import type { AppConfig } from '../../platform/config/index';
 import type { Db } from '../../platform/db/index';
+import { isExclusionViolation } from '../../platform/db/errors';
 import { loadUnavailableNights } from './access';
 import { toBlockDto } from './dto';
 import { blockInPast, blockNotFound, blockOverlaps, blockOverlapsBooking } from './errors';
@@ -26,12 +27,6 @@ export type AvailabilityServiceDependencies = {
   db: Db;
   config: AppConfig;
 };
-
-function isExclusionViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23P01'
-  );
-}
 
 function todayOf(config: AppConfig): string {
   return todayInTimeZone(config.listingTimeZone);

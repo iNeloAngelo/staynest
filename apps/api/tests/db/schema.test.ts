@@ -319,6 +319,51 @@ describeDatabase('схема БД: защита от пересечения да
     ).resolves.toBeUndefined();
   });
 
+  it('отклоняет бесконечные диапазоны брони и блокировки', async () => {
+    await expect(
+      client.query(
+        `INSERT INTO bookings (listing_id, guest_id, stay_range, guests_count, total_minor, currency, price_breakdown)
+         VALUES ($1, $2, daterange(NULL, NULL, '[)'), 2, 100000, 'RUB', '{}')`,
+        [ids.listingId, ids.guestId],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+
+    await expect(
+      client.query(
+        `INSERT INTO listing_blocks (listing_id, block_range)
+         VALUES ($1, daterange(NULL, NULL, '[)'))`,
+        [ids.listingId],
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('канонизирует включительные границы в [) и не теряет ночи', async () => {
+    const booking = await client.query<{
+      range: string;
+      check_out: string;
+      nights: number;
+    }>(
+      `INSERT INTO bookings (listing_id, guest_id, stay_range, guests_count, total_minor, currency, price_breakdown)
+       VALUES ($1, $2, daterange('2026-07-10', '2026-07-12', '[]'), 2, 100000, 'RUB', '{}')
+       RETURNING stay_range::text AS range, check_out::text, nights`,
+      [ids.listingId, ids.guestId],
+    );
+
+    expect(booking.rows[0]).toEqual({
+      range: '[2026-07-10,2026-07-13)',
+      check_out: '2026-07-13',
+      nights: 3,
+    });
+
+    const block = await client.query<{ range: string }>(
+      `INSERT INTO listing_blocks (listing_id, block_range)
+       VALUES ($1, daterange('2026-07-10', '2026-07-12', '(]'))
+       RETURNING block_range::text AS range`,
+      [ids.listingId],
+    );
+    expect(block.rows[0]?.range).toBe('[2026-07-11,2026-07-13)');
+  });
+
   it('заполняет справочник удобств 14 записями', async () => {
     const result = await client.query<{ count: string }>(
       'SELECT count(*)::text AS count FROM amenities',

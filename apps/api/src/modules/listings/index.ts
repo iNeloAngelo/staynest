@@ -1,2 +1,3 @@
 export { listingsRoutes } from './routes';
-export { requireOwnedListing } from './access';
+export { lockBookableListing, requireOwnedListing } from './access';
+export type { BookableListingRef } from './access';

@@ -10,6 +10,7 @@ import {
   resetTestSchema,
 } from '../support/harness';
 import type { Harness, TestUser } from '../support/harness';
+import { futureDay, insertBookingRow, seedListing } from '../support/booking-fixtures';
 
 const url = databaseUrl ?? '';
 const activeHarnesses: Harness[] = [];
@@ -335,5 +336,101 @@ describeDatabase('IDOR: объявления', () => {
 
     expect(archive.statusCode).toBe(404);
     expect(remove.statusCode).toBe(404);
+  });
+});
+
+type BookingAttack = {
+  name: string;
+  method: 'GET' | 'POST';
+  path: (id: string) => string;
+  payload?: unknown;
+};
+
+const BOOKING_ATTACKS: BookingAttack[] = [
+  { name: 'GET брони', method: 'GET', path: (id) => `/api/v1/bookings/${id}` },
+  { name: 'POST подтверждения', method: 'POST', path: (id) => `/api/v1/bookings/${id}/confirm` },
+  {
+    name: 'POST отклонения',
+    method: 'POST',
+    path: (id) => `/api/v1/bookings/${id}/decline`,
+    payload: { comment: 'Взлом' },
+  },
+  {
+    name: 'POST отмены',
+    method: 'POST',
+    path: (id) => `/api/v1/bookings/${id}/cancel`,
+    payload: { reason: 'Взлом' },
+  },
+];
+
+describeDatabase('IDOR: брони', () => {
+  let client: Client;
+  let h: Harness;
+  let host: TestUser;
+  let guest: TestUser;
+  let stranger: TestUser;
+  let bookingId: string;
+
+  beforeAll(async () => {
+    if (!url) return;
+    client = await resetTestSchema(url);
+    h = await createHarness();
+    host = await createUser(h, 'host@example.ru', 'Хозяин');
+    guest = await createUser(h, 'guest@example.ru', 'Гость');
+    stranger = await createUser(h, 'stranger@example.ru', 'Посторонний');
+    const listingId = await seedListing(h, host.id);
+    bookingId = await insertBookingRow(h, {
+      listingId,
+      guestId: guest.id,
+      from: futureDay(20),
+      to: futureDay(22),
+    });
+  });
+
+  afterAll(async () => {
+    await h?.app.close();
+    await h?.db.close();
+    await client?.end();
+  });
+
+  it.each(BOOKING_ATTACKS)('$name: посторонний получает 404', async (attack: BookingAttack) => {
+    const options: InjectOptions = {
+      method: attack.method,
+      url: attack.path(bookingId),
+      headers: { cookie: stranger.cookie },
+    };
+    if (attack.payload !== undefined) options.payload = attack.payload as InjectOptions['payload'];
+
+    const response = await h.app.inject(options);
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ code: 'booking_not_found' });
+  });
+
+  it('гость не может подтвердить свою заявку', async () => {
+    const response = await h.app.inject({
+      method: 'POST',
+      url: `/api/v1/bookings/${bookingId}/confirm`,
+      headers: { cookie: guest.cookie },
+    });
+
+    expect(response.statusCode).toBe(403);
+    const row = await h.db.kysely
+      .selectFrom('bookings')
+      .select('status')
+      .where('id', '=', bookingId)
+      .executeTakeFirstOrThrow();
+    expect(row.status).toBe('pending');
+  });
+
+  it('хозяин и гость видят свою бронь', async () => {
+    for (const user of [host, guest]) {
+      const response = await h.app.inject({
+        method: 'GET',
+        url: `/api/v1/bookings/${bookingId}`,
+        headers: { cookie: user.cookie },
+      });
+      expect(response.statusCode).toBe(200);
+    }
   });
 });

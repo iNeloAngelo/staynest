@@ -57,6 +57,25 @@ services:
       start_period: 20s
     mem_limit: 384m
 
+  worker:
+    image: staynest-api:latest
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    restart: unless-stopped
+    command: ['node', 'dist/worker.js']
+    stop_grace_period: 15s
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      SMTP_HOST: mailpit
+      SMTP_PORT: '1025'
+      APP_WEB_URL: https://${DOMAIN:?DOMAIN is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 192m
+
   postgres:
     # postgres:16-alpine, digest на 2026-10-19
     image: postgres@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea

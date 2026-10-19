@@ -44,6 +44,23 @@ export function lockOwnedListing(
     .executeTakeFirst();
 }
 
+/**
+ * Блокировка опубликованного объявления для движка бронирования.
+ * Черновик и архив не отличимы от несуществующего объявления.
+ */
+export function lockPublishedListing(
+  executor: DbExecutor,
+  id: string,
+): Promise<ListingRow | undefined> {
+  return executor
+    .selectFrom('listings')
+    .selectAll()
+    .where('id', '=', id)
+    .where('status', '=', 'published')
+    .forUpdate()
+    .executeTakeFirst();
+}
+
 export function listOwnedListings(executor: DbExecutor, ownerId: string): Promise<ListingRow[]> {
   return executor
     .selectFrom('listings')
@@ -225,6 +242,7 @@ export async function countPendingBookings(
     .select(['listing_id', ({ fn }) => fn.countAll<string>().as('count')])
     .where('listing_id', 'in', listingIds)
     .where('status', '=', 'pending')
+    .where(sql<boolean>`(expires_at IS NULL OR expires_at > now())`)
     .groupBy('listing_id')
     .execute()) as PendingCountRow[];
 
@@ -241,7 +259,12 @@ export function hasActiveFutureBookings(
     .selectFrom('bookings')
     .select('id')
     .where('listing_id', '=', listingId)
-    .where('status', 'in', ['pending', 'confirmed'])
+    .where(
+      sql<boolean>`(
+      status = 'confirmed'
+      OR (status = 'pending' AND (expires_at IS NULL OR expires_at > now()))
+    )`,
+    )
     .where('check_out', '>=', sql<string>`current_date`)
     .executeTakeFirst();
 }

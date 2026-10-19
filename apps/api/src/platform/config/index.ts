@@ -71,6 +71,11 @@ const envSchema = z.object({
     .default(10 * 1024 * 1024),
   PHOTO_MAX_PER_LISTING: z.coerce.number().int().min(1).max(100).default(20),
   PHOTO_MAX_PIXELS: z.coerce.number().int().min(1_000_000).max(40_000_000).default(32_000_000),
+
+  BOOKING_REQUEST_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+  BOOKING_MAX_ACTIVE_PENDING: z.coerce.number().int().min(1).max(50).default(5),
+  BOOKING_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000).default(10),
+  BOOKING_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(1_440).default(10),
 });
 
 type LogLevel = z.infer<typeof logLevelSchema>;
@@ -110,6 +115,17 @@ export type StorageConfig = {
   maxPixels: number;
 };
 
+type BookingConfig = {
+  /** Срок ответа хозяина на заявку. */
+  requestTtlHours: number;
+  /** Максимум активных (pending) заявок одного гостя. */
+  maxActivePending: number;
+  rateLimit: {
+    max: number;
+    windowMs: number;
+  };
+};
+
 export type AppConfig = {
   nodeEnv: 'development' | 'test' | 'production';
   host: string;
@@ -124,6 +140,7 @@ export type AppConfig = {
   auth: AuthConfig;
   mail: MailConfig;
   storage: StorageConfig;
+  booking: BookingConfig;
 };
 
 function loadDotEnvFiles(): void {
@@ -142,6 +159,17 @@ function requireInProduction(env: NodeJS.ProcessEnv, keys: string[]): void {
 
 function optionalSecret(value: string | undefined): string | undefined {
   return value?.trim() || undefined;
+}
+
+function bookingConfig(data: EnvData): BookingConfig {
+  return {
+    requestTtlHours: data.BOOKING_REQUEST_TTL_HOURS,
+    maxActivePending: data.BOOKING_MAX_ACTIVE_PENDING,
+    rateLimit: {
+      max: data.BOOKING_RATE_LIMIT_MAX,
+      windowMs: data.BOOKING_RATE_LIMIT_WINDOW_MINUTES * 60_000,
+    },
+  };
 }
 
 type EnvData = z.infer<typeof envSchema>;
@@ -242,5 +270,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       maxPerListing: data.PHOTO_MAX_PER_LISTING,
       maxPixels: data.PHOTO_MAX_PIXELS,
     },
+    booking: bookingConfig(data),
   };
 }

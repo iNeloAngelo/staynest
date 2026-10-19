@@ -86,6 +86,11 @@ export function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       maxPerListing: 20,
       maxPixels: 40_000_000,
     },
+    booking: overrides.booking ?? {
+      requestTtlHours: 24,
+      maxActivePending: 5,
+      rateLimit: { max: 1_000, windowMs: 60_000 },
+    },
   };
 }
 

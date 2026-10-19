@@ -25,7 +25,13 @@ export type HostBookingRow = {
   guestName: string;
 };
 
-const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'confirmed'];
+/** Pending с истёкшим TTL больше не занимает даты, даже если джоб отстаёт. */
+function activeBookingCondition() {
+  return sql<boolean>`(
+    status = 'confirmed'
+    OR (status = 'pending' AND (expires_at IS NULL OR expires_at > now()))
+  )`;
+}
 
 export async function listAvailabilityRanges(
   executor: DbExecutor,
@@ -40,7 +46,7 @@ export async function listAvailabilityRanges(
       sql<string>`upper(stay_range)::text`.as('to'),
     ])
     .where('listing_id', '=', listingId)
-    .where('status', 'in', ACTIVE_STATUSES)
+    .where(activeBookingCondition())
     .where(sql<boolean>`stay_range && daterange(${from}::date, ${to}::date, '[)')`)
     .execute();
 
@@ -99,7 +105,12 @@ export function listHostBookings(
       'users.display_name as guestName',
     ])
     .where('bookings.listing_id', '=', listingId)
-    .where('bookings.status', 'in', ACTIVE_STATUSES)
+    .where(
+      sql<boolean>`(
+      bookings.status = 'confirmed'
+      OR (bookings.status = 'pending' AND (bookings.expires_at IS NULL OR bookings.expires_at > now()))
+    )`,
+    )
     .where(sql<boolean>`stay_range && daterange(${from}::date, ${to}::date, '[)')`)
     .orderBy('bookings.check_in', 'asc')
     .execute() as Promise<HostBookingRow[]>;
@@ -115,7 +126,7 @@ export async function hasBookingOverlap(
     .selectFrom('bookings')
     .select('id')
     .where('listing_id', '=', listingId)
-    .where('status', 'in', ACTIVE_STATUSES)
+    .where(activeBookingCondition())
     .where(sql<boolean>`stay_range && daterange(${from}::date, ${to}::date, '[)')`)
     .executeTakeFirst();
 

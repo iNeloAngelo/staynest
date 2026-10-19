@@ -58,7 +58,12 @@ function busyListings(db: QueryCreator<DB>, filters: CatalogQuery) {
   const booked = db
     .selectFrom('bookings')
     .select('listing_id')
-    .where('status', 'in', ['pending', 'confirmed'])
+    .where(
+      sql<boolean>`(
+      status = 'confirmed'
+      OR (status = 'pending' AND (expires_at IS NULL OR expires_at > now()))
+    )`,
+    )
     .where(sql<boolean>`stay_range && ${range}`);
   const blocked = db
     .selectFrom('listing_blocks')

@@ -86,6 +86,11 @@ function makeConfig(): AppConfig {
       maxPerListing: 20,
       maxPixels: 40_000_000,
     },
+    booking: {
+      requestTtlHours: 24,
+      maxActivePending: 5,
+      rateLimit: { max: 1_000, windowMs: 60_000 },
+    },
   };
 }
 

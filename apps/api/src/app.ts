@@ -8,6 +8,8 @@ import type { Logger } from 'pino';
 import { authRoutes } from './modules/auth/index';
 import type { AuthOptions } from './modules/auth/index';
 import { availabilityRoutes } from './modules/availability/index';
+import { bookingsRoutes } from './modules/bookings/index';
+import type { BookingOptions } from './modules/bookings/index';
 import { catalogRoutes } from './modules/catalog/index';
 import { healthRoutes } from './modules/health/index';
 import { listingsRoutes } from './modules/listings/index';
@@ -31,6 +33,7 @@ export type AppDependencies = {
   mailer?: Mailer;
   events?: EventBus;
   auth?: AuthOptions;
+  booking?: BookingOptions;
   storage?: MediaStorage;
 };
 
@@ -60,6 +63,7 @@ type ModuleDeps = {
   events: EventBus;
   storage: MediaStorage;
   auth?: AuthOptions;
+  booking?: BookingOptions;
 };
 
 async function registerModules({
@@ -71,6 +75,7 @@ async function registerModules({
   events,
   storage,
   auth,
+  booking,
 }: ModuleDeps) {
   await app.register(healthRoutes, { prefix: '/api/v1', db });
   await app.register(authRoutes, {
@@ -85,6 +90,7 @@ async function registerModules({
   await app.register(catalogRoutes, { prefix: '/api/v1', db, storage });
   await app.register(availabilityRoutes, { prefix: '/api/v1', db, config });
   await app.register(pricingRoutes, { prefix: '/api/v1', db, config });
+  await app.register(bookingsRoutes, { prefix: '/api/v1', config, db, events, booking });
   await app.register(listingsRoutes, { prefix: '/api/v1', config, db, events, storage, logger });
   await app.register(photosRoutes, { prefix: '/api/v1', config, db, storage, logger });
 }
@@ -136,6 +142,7 @@ export async function buildApp({ config, logger, db, ...deps }: AppDependencies)
     events,
     storage,
     auth: deps.auth,
+    booking: deps.booking,
   });
 
   return app;

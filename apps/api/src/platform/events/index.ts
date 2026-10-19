@@ -1,7 +1,16 @@
 import { EventEmitter } from 'node:events';
-import type { Locale } from '@staynest/shared';
+import type { BookingStatus, Locale } from '@staynest/shared';
 import type { Logger } from 'pino';
 import { errorCode } from '../errors/code';
+
+export type BookingEventPayload = {
+  bookingId: string;
+  listingId: string;
+  guestId: string;
+  hostId: string;
+  status: BookingStatus;
+  occurredAt: string;
+};
 
 type AppEventMap = {
   'user.registered': {
@@ -14,6 +23,12 @@ type AppEventMap = {
     ownerId: string;
     occurredAt: string;
   };
+  'booking.requested': BookingEventPayload;
+  'booking.confirmed': BookingEventPayload;
+  'booking.declined': BookingEventPayload;
+  'booking.cancelled': BookingEventPayload & { actorId: string };
+  'booking.expired': BookingEventPayload;
+  'booking.completed': BookingEventPayload;
 };
 
 type EventName = keyof AppEventMap;
