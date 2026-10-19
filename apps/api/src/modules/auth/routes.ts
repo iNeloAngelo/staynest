@@ -27,6 +27,7 @@ import { AppError } from '../../platform/http/errors';
 import type { Mailer } from '../../platform/mailer/index';
 import { parseInput } from '../../platform/http/validate';
 import { unauthorized } from './errors';
+import { createAuthGuard } from './guard';
 import { createAuthService } from './service';
 import type { AuthService } from './service';
 import type { AuthOptions } from './service-context';
@@ -48,7 +49,7 @@ type AuthRoutesOptions = {
   auth?: AuthOptions;
 };
 
-type Guard = (request: FastifyRequest) => Promise<void>;
+type Guard = ReturnType<typeof createAuthGuard>;
 
 function noStore(reply: FastifyReply): void {
   reply.header('cache-control', 'private, no-store');
@@ -82,12 +83,6 @@ function clearSessionCookies(reply: FastifyReply): void {
 function authOf(request: FastifyRequest): AuthContext {
   if (!request.auth) throw unauthorized();
   return request.auth;
-}
-
-function createGuard(service: AuthService): Guard {
-  return async (request) => {
-    request.auth = await service.authenticate(request.cookies[ACCESS_COOKIE]);
-  };
 }
 
 function registerPublicRoutes(app: FastifyInstance, service: AuthService, config: AppConfig): void {
@@ -206,7 +201,7 @@ export const authRoutes: FastifyPluginAsync<AuthRoutesOptions> = async (app, opt
     options: options.auth,
   });
 
-  const guard = createGuard(service);
+  const guard = createAuthGuard({ db: options.db, config: options.config });
   registerPublicRoutes(app, service, options.config);
   registerAccountRoutes(app, service, guard);
   registerMeRoutes(app, service, guard);

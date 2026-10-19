@@ -9,6 +9,11 @@ type AppEventMap = {
     locale: Locale;
     occurredAt: string;
   };
+  'listing.published': {
+    listingId: string;
+    ownerId: string;
+    occurredAt: string;
+  };
 };
 
 type EventName = keyof AppEventMap;

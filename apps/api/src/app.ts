@@ -7,6 +7,7 @@ import type { Logger } from 'pino';
 import { authRoutes } from './modules/auth/index';
 import type { AuthOptions } from './modules/auth/index';
 import { healthRoutes } from './modules/health/index';
+import { listingsRoutes } from './modules/listings/index';
 import type { AppConfig } from './platform/config/index';
 import type { Db } from './platform/db/index';
 import { createEventBus } from './platform/events/index';
@@ -81,6 +82,12 @@ export async function buildApp({ config, logger, db, ...deps }: AppDependencies)
     mailer,
     events,
     auth: deps.auth,
+  });
+  await app.register(listingsRoutes, {
+    prefix: '/api/v1',
+    config,
+    db,
+    events,
   });
 
   return app;
