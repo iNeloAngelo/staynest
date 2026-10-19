@@ -7,6 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import { authRoutes } from './modules/auth/index';
 import type { AuthOptions } from './modules/auth/index';
+import { catalogRoutes } from './modules/catalog/index';
 import { healthRoutes } from './modules/health/index';
 import { listingsRoutes } from './modules/listings/index';
 import { photosRoutes } from './modules/photos/index';
@@ -79,6 +80,7 @@ async function registerModules({
     events,
     auth,
   });
+  await app.register(catalogRoutes, { prefix: '/api/v1', db, storage });
   await app.register(listingsRoutes, { prefix: '/api/v1', config, db, events, storage, logger });
   await app.register(photosRoutes, { prefix: '/api/v1', config, db, storage, logger });
 }
