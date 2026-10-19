@@ -74,6 +74,17 @@ function makeConfig(): AppConfig {
       argon2: { memoryCost: 19_456, timeCost: 2, parallelism: 1 },
     },
     mail: { host: 'localhost', port: 1025, from: 'StayNest <no-reply@staynest.local>' },
+    storage: {
+      endpoint: 'http://localhost:9000',
+      region: 'us-east-1',
+      bucket: 'staynest-media',
+      accessKey: 'test',
+      secretKey: 'test-secret',
+      publicPath: '/media',
+      maxUploadBytes: 10 * 1024 * 1024,
+      maxPerListing: 20,
+      maxPixels: 40_000_000,
+    },
   };
 }
 

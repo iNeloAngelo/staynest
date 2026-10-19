@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { listingPhotoDtoSchema } from './photos';
 
 export const listingTypeSchema = z.enum(['house', 'cottage', 'cabin', 'villa', 'townhouse']);
 
@@ -133,6 +134,7 @@ export const listingDtoSchema = z.object({
   checkOutTime: z.string(),
   houseRules: z.string().nullable(),
   coverPhotoId: z.uuid().nullable(),
+  photos: z.array(listingPhotoDtoSchema),
   amenities: z.array(amenityDtoSchema),
   pendingBookingsCount: z.number().int(),
   createdAt: z.iso.datetime(),

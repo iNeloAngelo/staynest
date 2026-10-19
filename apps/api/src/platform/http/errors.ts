@@ -137,7 +137,7 @@ export function problemErrorHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): void {
-  if (error instanceof AppError && error.status < 500) {
+  if (error instanceof AppError) {
     sendProblem(reply, {
       status: error.status,
       code: error.code,

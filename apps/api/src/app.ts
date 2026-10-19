@@ -3,11 +3,13 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import Fastify from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import { authRoutes } from './modules/auth/index';
 import type { AuthOptions } from './modules/auth/index';
 import { healthRoutes } from './modules/health/index';
 import { listingsRoutes } from './modules/listings/index';
+import { photosRoutes } from './modules/photos/index';
 import type { AppConfig } from './platform/config/index';
 import type { Db } from './platform/db/index';
 import { createEventBus } from './platform/events/index';
@@ -16,6 +18,8 @@ import { problemErrorHandler, problemNotFoundHandler } from './platform/http/err
 import { createOriginGuard } from './platform/http/origin';
 import { createNoopMailer } from './platform/mailer/index';
 import type { Mailer } from './platform/mailer/index';
+import { createMediaStorage } from './platform/storage/index';
+import type { MediaStorage } from './platform/storage/index';
 
 export type AppDependencies = {
   config: AppConfig;
@@ -24,32 +28,75 @@ export type AppDependencies = {
   mailer?: Mailer;
   events?: EventBus;
   auth?: AuthOptions;
+  storage?: MediaStorage;
 };
+
+const HELMET_OPTIONS = {
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+    },
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' as const },
+  crossOriginOpenerPolicy: { policy: 'same-origin' as const },
+  xFrameOptions: { action: 'deny' as const },
+};
+
+type ModuleDeps = {
+  // Fastify с pino-Logger типизируется строже, чем базовый FastifyInstance;
+  // на сборке модулей эта разница не важна.
+  app: FastifyInstance;
+  config: AppConfig;
+  db: Db;
+  logger: Logger;
+  mailer: Mailer;
+  events: EventBus;
+  storage: MediaStorage;
+  auth?: AuthOptions;
+};
+
+async function registerModules({
+  app,
+  config,
+  db,
+  logger,
+  mailer,
+  events,
+  storage,
+  auth,
+}: ModuleDeps) {
+  await app.register(healthRoutes, { prefix: '/api/v1', db });
+  await app.register(authRoutes, {
+    prefix: '/api/v1',
+    config,
+    db,
+    logger,
+    mailer,
+    events,
+    auth,
+  });
+  await app.register(listingsRoutes, { prefix: '/api/v1', config, db, events, storage, logger });
+  await app.register(photosRoutes, { prefix: '/api/v1', config, db, storage, logger });
+}
 
 export async function buildApp({ config, logger, db, ...deps }: AppDependencies) {
   const app = Fastify({
     loggerInstance: logger,
     genReqId: () => randomUUID(),
     bodyLimit: 1024 * 1024,
+    connectionTimeout: 30_000,
     trustProxy: config.trustProxy,
   });
 
   const mailer = deps.mailer ?? createNoopMailer(logger);
   const events = deps.events ?? createEventBus(logger);
+  const storage = deps.storage ?? createMediaStorage(config.storage, logger);
 
-  await app.register(helmet, {
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        baseUri: ["'self'"],
-        frameAncestors: ["'none'"],
-        objectSrc: ["'none'"],
-      },
-    },
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-    crossOriginOpenerPolicy: { policy: 'same-origin' },
-    xFrameOptions: { action: 'deny' },
-  });
+  await app.register(helmet, HELMET_OPTIONS);
 
   await app.register(cors, {
     origin: config.corsOrigins,
@@ -71,23 +118,18 @@ export async function buildApp({ config, logger, db, ...deps }: AppDependencies)
 
   app.addHook('onClose', async () => {
     mailer.close();
+    storage.close();
   });
 
-  await app.register(healthRoutes, { prefix: '/api/v1', db });
-  await app.register(authRoutes, {
-    prefix: '/api/v1',
+  await registerModules({
+    app: app as unknown as FastifyInstance,
     config,
     db,
     logger,
     mailer,
     events,
+    storage,
     auth: deps.auth,
-  });
-  await app.register(listingsRoutes, {
-    prefix: '/api/v1',
-    config,
-    db,
-    events,
   });
 
   return app;

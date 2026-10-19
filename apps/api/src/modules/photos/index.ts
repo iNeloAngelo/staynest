@@ -1,0 +1,1 @@
+export { photosRoutes } from './routes';

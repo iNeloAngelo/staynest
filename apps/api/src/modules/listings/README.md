@@ -40,9 +40,22 @@
 
 ## Таблицы
 
-`listings`, `listing_amenities`. Модуль только читает `listing_photos` (число
-фото для публикации) и `bookings` (число заявок и запрет архива) — это
-read-only проверки, запись в чужие таблицы остаётся у `photos` и `bookings`.
+`listings`, `listing_amenities`. Модуль только читает `listing_photos` (фото в
+`ListingDto`, число фото для публикации) и `bookings` (число заявок и запрет
+архива) — это read-only проверки, запись в чужие таблицы остаётся у `photos` и
+`bookings`. При удалении черновика модуль удаляет объекты его фото из хранилища.
+
+## Публичный интерфейс для других модулей
+
+Кроме маршрутов, `index.ts` экспортирует `requireOwnedListing(executor, ownerId,
+listingId, { lock })` — минимальный снимок объявления с проверкой владения.
+Модуль `photos` использует его вместо прямого чтения таблицы `listings`.
+
+## DTO и фото
+
+`ListingDto` содержит `photos: ListingPhotoDto[]` с тремя относительными URL
+(`thumb`/`md`/`lg`), `width`, `height`, `blurhash`, `position` и `isCover`.
+`coverPhotoId` остаётся денормализованным указателем для быстрых списков.
 
 ## События
 

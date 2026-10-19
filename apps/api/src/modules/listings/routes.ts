@@ -10,12 +10,14 @@ import {
 } from '@staynest/shared';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import type { Logger } from 'pino';
 import type { AppConfig } from '../../platform/config/index';
 import type { Db } from '../../platform/db/index';
 import type { EventBus } from '../../platform/events/index';
 import type { AuthContext } from '../../platform/http/auth-context';
 import { AppError } from '../../platform/http/errors';
 import { parseInput } from '../../platform/http/validate';
+import type { MediaStorage } from '../../platform/storage/index';
 import { createAuthGuard } from '../auth/index';
 import { createListingService } from './service';
 import type { ListingService } from './service';
@@ -24,6 +26,8 @@ type ListingsRoutesOptions = {
   config: AppConfig;
   db: Db;
   events: EventBus;
+  storage: MediaStorage;
+  logger: Logger;
 };
 
 const listingParamsSchema = z.object({ id: z.uuid() }).strict();
@@ -124,6 +128,8 @@ export const listingsRoutes: FastifyPluginAsync<ListingsRoutesOptions> = async (
     db: options.db,
     config: options.config,
     events: options.events,
+    storage: options.storage,
+    logger: options.logger,
   });
   const guard = createAuthGuard({ db: options.db, config: options.config });
 

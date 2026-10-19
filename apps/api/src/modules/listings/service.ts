@@ -7,8 +7,12 @@ import type {
 } from '@staynest/shared';
 import type { AppConfig } from '../../platform/config/index';
 import type { Db, DbExecutor } from '../../platform/db/index';
+import { errorCode } from '../../platform/errors/code';
 import type { EventBus } from '../../platform/events/index';
 import type { AuthContext } from '../../platform/http/auth-context';
+import { photoKeys } from '../../platform/storage/index';
+import type { MediaStorage } from '../../platform/storage/index';
+import type { Logger } from 'pino';
 import { toAmenityDto, toListingDto } from './dto';
 import {
   amenityNotFound,
@@ -34,13 +38,16 @@ import {
   listAmenities,
   listAmenitiesForListings,
   listListingAmenities,
+  listListingPhotos,
   listOwnedListings,
+  listPhotoPrefixes,
+  listPhotosForListings,
   lockOwnedListing,
   publishListing,
   replaceAmenities as replaceListingAmenities,
   updateListing,
 } from './repo';
-import type { AmenityRow, ListingAmenityRow, ListingPatch, ListingRow } from './repo';
+import type { AmenityRow, ListingAmenityRow, ListingPatch, ListingRow, PhotoRow } from './repo';
 import { assertNightsRange, completenessIssues, publishIssues } from './validation';
 import type { CompletenessFields } from './validation';
 
@@ -48,19 +55,44 @@ export type ListingServiceDependencies = {
   db: Db;
   config: AppConfig;
   events: EventBus;
+  storage: MediaStorage;
+  logger: Logger;
 };
 
-async function withDetails(executor: DbExecutor, row: ListingRow): Promise<ListingDto> {
-  const [amenities, counts] = await Promise.all([
+async function withDetails(
+  executor: DbExecutor,
+  row: ListingRow,
+  storage: MediaStorage,
+): Promise<ListingDto> {
+  const [photos, amenities, counts] = await Promise.all([
+    listListingPhotos(executor, row.id),
     listListingAmenities(executor, row.id),
     countPendingBookings(executor, [row.id]),
   ]);
 
-  return toListingDto(row, amenities, counts.get(row.id) ?? 0);
+  return toListingDto({
+    row,
+    photos,
+    amenities,
+    pendingBookingsCount: counts.get(row.id) ?? 0,
+    storage,
+  });
 }
 
 function groupAmenities(rows: ListingAmenityRow[]): Map<string, AmenityRow[]> {
   const groups = new Map<string, AmenityRow[]>();
+
+  for (const row of rows) {
+    const list = groups.get(row.listing_id) ?? [];
+    list.push(row);
+    groups.set(row.listing_id, list);
+  }
+
+  return groups;
+}
+
+function groupPhotos(rows: PhotoRow[]): Map<string, PhotoRow[]> {
+  const groups = new Map<string, PhotoRow[]>();
 
   for (const row of rows) {
     const list = groups.get(row.listing_id) ?? [];
@@ -119,11 +151,11 @@ function assertStillComplete(row: ListingRow, patch: ListingPatch): void {
   if (issues.length > 0) throw listingIncomplete(issues);
 }
 
-function draftService({ db }: ListingServiceDependencies) {
+function draftService({ db, storage }: ListingServiceDependencies) {
   return {
     async createDraft(ownerId: string, input: CreateListingInput): Promise<ListingDto> {
       const row = await insertDraft(db.kysely, ownerId, input.type);
-      return toListingDto(row, [], 0);
+      return toListingDto({ row, photos: [], amenities: [], pendingBookingsCount: 0, storage });
     },
 
     async update(ownerId: string, id: string, input: UpdateListingInput): Promise<ListingDto> {
@@ -144,7 +176,7 @@ function draftService({ db }: ListingServiceDependencies) {
         throw error;
       }
 
-      return withDetails(db.kysely, updated);
+      return withDetails(db.kysely, updated, storage);
     },
 
     async replaceAmenities(
@@ -164,12 +196,12 @@ function draftService({ db }: ListingServiceDependencies) {
         return owned;
       });
 
-      return withDetails(db.kysely, row);
+      return withDetails(db.kysely, row, storage);
     },
   };
 }
 
-function statusService({ db, config, events }: ListingServiceDependencies) {
+function statusService({ db, config, events, storage, logger }: ListingServiceDependencies) {
   return {
     async publish(actor: AuthContext, id: string): Promise<ListingDto> {
       let updated: ListingRow;
@@ -197,7 +229,7 @@ function statusService({ db, config, events }: ListingServiceDependencies) {
         occurredAt: updated.published_at?.toISOString() ?? new Date().toISOString(),
       });
 
-      return withDetails(db.kysely, updated);
+      return withDetails(db.kysely, updated, storage);
     },
 
     async archive(ownerId: string, id: string): Promise<ListingDto> {
@@ -209,34 +241,53 @@ function statusService({ db, config, events }: ListingServiceDependencies) {
         return archiveListing(trx, id);
       });
 
-      return withDetails(db.kysely, updated);
+      return withDetails(db.kysely, updated, storage);
     },
 
     async remove(ownerId: string, id: string): Promise<void> {
+      let prefixes: string[] = [];
+
       await db.kysely.transaction().execute(async (trx) => {
         const row = await requireOwned(trx, ownerId, id, true);
         if (row.status !== 'draft') throw listingNotDraft();
+
+        prefixes = (await listPhotoPrefixes(trx, id)).map((photo) => photo.storage_prefix);
         await deleteListing(trx, id);
       });
+
+      try {
+        await storage.remove(prefixes.flatMap((prefix) => photoKeys(prefix)));
+      } catch (error) {
+        // Строка уже удалена: объект-сирота не должен превращать 204 в 500.
+        logger.warn({ code: errorCode(error) }, 'failed to remove listing media');
+      }
     },
   };
 }
 
-function readService({ db }: ListingServiceDependencies) {
+function readService({ db, storage }: ListingServiceDependencies) {
   return {
     async listMine(ownerId: string): Promise<ListingDto[]> {
       const rows = await listOwnedListings(db.kysely, ownerId);
       if (rows.length === 0) return [];
 
       const ids = rows.map((row) => row.id);
-      const [amenities, counts] = await Promise.all([
+      const [photos, amenities, counts] = await Promise.all([
+        listPhotosForListings(db.kysely, ids),
         listAmenitiesForListings(db.kysely, ids),
         countPendingBookings(db.kysely, ids),
       ]);
+      const photoGroups = groupPhotos(photos);
       const groups = groupAmenities(amenities);
 
       return rows.map((row) =>
-        toListingDto(row, groups.get(row.id) ?? [], counts.get(row.id) ?? 0),
+        toListingDto({
+          row,
+          photos: photoGroups.get(row.id) ?? [],
+          amenities: groups.get(row.id) ?? [],
+          pendingBookingsCount: counts.get(row.id) ?? 0,
+          storage,
+        }),
       );
     },
 

@@ -6,7 +6,13 @@ const baseEnv = {
   CORS_ORIGINS: 'https://staynest.example',
   JWT_SECRET: 'test-secret-with-at-least-32-characters',
   SMTP_HOST: 'localhost',
+  APP_WEB_URL: 'https://staynest.example',
+  S3_ENDPOINT: 'https://s3.example',
+  S3_BUCKET: 'staynest-media',
+  S3_SECRET_KEY: 'production-secret',
 };
+
+const prodEnv = { ...baseEnv, NODE_ENV: 'production' };
 
 describe('loadConfig', () => {
   it('разбирает список CORS и флаг trust proxy', () => {
@@ -33,6 +39,8 @@ describe('loadConfig', () => {
       ARGON2_MEMORY_KIB: '32768',
       SMTP_PORT: '2525',
       APP_WEB_URL: 'https://staynest.example/',
+      PHOTO_MAX_UPLOAD_BYTES: '5242880',
+      MEDIA_PUBLIC_PATH: '/media/',
     });
 
     expect(config.auth.requireEmailVerification).toBe(false);
@@ -42,67 +50,43 @@ describe('loadConfig', () => {
     expect(config.webAppUrl).toBe('https://staynest.example');
     expect(config.mail.port).toBe(2525);
     expect(config.mail.password).toBeUndefined();
+    expect(config.storage.maxUploadBytes).toBe(5_242_880);
+    expect(config.storage.publicPath).toBe('/media');
+    expect(config.storage.bucket).toBe('staynest-media');
   });
 
   it('падает в production без DATABASE_URL', () => {
-    expect(() =>
-      loadConfig({
-        NODE_ENV: 'production',
-        CORS_ORIGINS: baseEnv.CORS_ORIGINS,
-        JWT_SECRET: baseEnv.JWT_SECRET,
-        SMTP_HOST: baseEnv.SMTP_HOST,
-      }),
-    ).toThrow(/DATABASE_URL/);
+    expect(() => loadConfig({ ...prodEnv, DATABASE_URL: '' })).toThrow(/DATABASE_URL/);
   });
 
   it('падает в production без CORS_ORIGINS', () => {
-    expect(() =>
-      loadConfig({
-        NODE_ENV: 'production',
-        DATABASE_URL: baseEnv.DATABASE_URL,
-        JWT_SECRET: baseEnv.JWT_SECRET,
-        SMTP_HOST: baseEnv.SMTP_HOST,
-      }),
-    ).toThrow(/CORS_ORIGINS/);
+    expect(() => loadConfig({ ...prodEnv, CORS_ORIGINS: '' })).toThrow(/CORS_ORIGINS/);
   });
 
   it('падает в production без JWT_SECRET', () => {
-    expect(() =>
-      loadConfig({
-        NODE_ENV: 'production',
-        DATABASE_URL: baseEnv.DATABASE_URL,
-        CORS_ORIGINS: baseEnv.CORS_ORIGINS,
-        SMTP_HOST: baseEnv.SMTP_HOST,
-        APP_WEB_URL: 'https://staynest.example',
-      }),
-    ).toThrow(/JWT_SECRET/);
+    expect(() => loadConfig({ ...prodEnv, JWT_SECRET: '' })).toThrow(/JWT_SECRET/);
   });
 
   it('падает в production с dev-значением JWT_SECRET', () => {
     expect(() =>
       loadConfig({
-        NODE_ENV: 'production',
-        DATABASE_URL: baseEnv.DATABASE_URL,
-        CORS_ORIGINS: baseEnv.CORS_ORIGINS,
+        ...prodEnv,
         JWT_SECRET: 'dev-only-jwt-secret-change-me-before-production',
-        SMTP_HOST: baseEnv.SMTP_HOST,
-        APP_WEB_URL: 'https://staynest.example',
       }),
     ).toThrow(/dev-значением/);
   });
 
   it('падает в production с выключенным REQUIRE_EMAIL_VERIFICATION', () => {
-    expect(() =>
-      loadConfig({
-        NODE_ENV: 'production',
-        DATABASE_URL: baseEnv.DATABASE_URL,
-        CORS_ORIGINS: baseEnv.CORS_ORIGINS,
-        JWT_SECRET: baseEnv.JWT_SECRET,
-        SMTP_HOST: baseEnv.SMTP_HOST,
-        APP_WEB_URL: 'https://staynest.example',
-        REQUIRE_EMAIL_VERIFICATION: 'false',
-      }),
-    ).toThrow(/REQUIRE_EMAIL_VERIFICATION/);
+    expect(() => loadConfig({ ...prodEnv, REQUIRE_EMAIL_VERIFICATION: 'false' })).toThrow(
+      /REQUIRE_EMAIL_VERIFICATION/,
+    );
+  });
+
+  it('падает в production с dev-паролем хранилища и без S3_ENDPOINT', () => {
+    expect(() => loadConfig({ ...prodEnv, S3_SECRET_KEY: 'staynest-minio' })).toThrow(
+      /S3_SECRET_KEY/,
+    );
+    expect(() => loadConfig({ ...prodEnv, S3_ENDPOINT: '' })).toThrow(/S3_ENDPOINT/);
   });
 
   it('нормализует завершающий слэш в CORS_ORIGINS', () => {

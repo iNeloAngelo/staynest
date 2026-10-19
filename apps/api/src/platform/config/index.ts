@@ -31,11 +31,33 @@ const envSchema = z.object({
   ARGON2_TIME_COST: z.coerce.number().int().min(2).max(10).default(2),
   ARGON2_PARALLELISM: z.coerce.number().int().min(1).max(16).default(1),
 
-  SMTP_HOST: z.string().min(1).default('localhost'),
+  SMTP_HOST: z.string().min(1).default('127.0.0.1'),
   SMTP_PORT: z.coerce.number().int().positive().max(65_535).default(1025),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   MAIL_FROM: z.string().min(3).default('StayNest <no-reply@staynest.local>'),
+
+  S3_ENDPOINT: z.string().url().default('http://localhost:9000'),
+  S3_REGION: z.string().min(1).default('us-east-1'),
+  S3_BUCKET: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .default('staynest-media'),
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+  MEDIA_PUBLIC_PATH: z
+    .string()
+    .regex(/^\/[a-z0-9/_-]*$/)
+    .default('/media'),
+
+  PHOTO_MAX_UPLOAD_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024 * 1024)
+    .max(50 * 1024 * 1024)
+    .default(10 * 1024 * 1024),
+  PHOTO_MAX_PER_LISTING: z.coerce.number().int().min(1).max(100).default(20),
+  PHOTO_MAX_PIXELS: z.coerce.number().int().min(1_000_000).max(40_000_000).default(32_000_000),
 });
 
 type LogLevel = z.infer<typeof logLevelSchema>;
@@ -62,6 +84,19 @@ export type MailConfig = {
   from: string;
 };
 
+export type StorageConfig = {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  accessKey: string;
+  secretKey: string;
+  /** Публичный префикс раздачи вариантов: `/media`. */
+  publicPath: string;
+  maxUploadBytes: number;
+  maxPerListing: number;
+  maxPixels: number;
+};
+
 export type AppConfig = {
   nodeEnv: 'development' | 'test' | 'production';
   host: string;
@@ -74,6 +109,7 @@ export type AppConfig = {
   webAppUrl: string;
   auth: AuthConfig;
   mail: MailConfig;
+  storage: StorageConfig;
 };
 
 function loadDotEnvFiles(): void {
@@ -105,6 +141,8 @@ function assertProductionConfig(env: NodeJS.ProcessEnv, data: EnvData): void {
     'JWT_SECRET',
     'SMTP_HOST',
     'APP_WEB_URL',
+    'S3_ENDPOINT',
+    'S3_BUCKET',
   ]);
 
   if (data.JWT_SECRET?.trim().startsWith('dev-only-')) {
@@ -120,6 +158,13 @@ function assertProductionConfig(env: NodeJS.ProcessEnv, data: EnvData): void {
   }
   if (data.REQUIRE_EMAIL_VERIFICATION !== 'true') {
     throw new Error('В production REQUIRE_EMAIL_VERIFICATION должен быть true.');
+  }
+
+  const secretKey = data.S3_SECRET_KEY?.trim() || env.MINIO_ROOT_PASSWORD?.trim();
+  if (!secretKey || secretKey === 'staynest-minio') {
+    throw new Error(
+      'В production задайте S3_SECRET_KEY (или MINIO_ROOT_PASSWORD), не dev-значение.',
+    );
   }
 }
 
@@ -166,6 +211,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       user: optionalSecret(data.SMTP_USER),
       password: optionalSecret(data.SMTP_PASSWORD),
       from: data.MAIL_FROM,
+    },
+    storage: {
+      endpoint: data.S3_ENDPOINT.replace(/\/+$/, ''),
+      region: data.S3_REGION,
+      bucket: data.S3_BUCKET,
+      accessKey:
+        optionalSecret(data.S3_ACCESS_KEY) ?? optionalSecret(env.MINIO_ROOT_USER) ?? 'staynest',
+      secretKey:
+        optionalSecret(data.S3_SECRET_KEY) ??
+        optionalSecret(env.MINIO_ROOT_PASSWORD) ??
+        'staynest-minio',
+      publicPath: data.MEDIA_PUBLIC_PATH.replace(/\/+$/, ''),
+      maxUploadBytes: data.PHOTO_MAX_UPLOAD_BYTES,
+      maxPerListing: data.PHOTO_MAX_PER_LISTING,
+      maxPixels: data.PHOTO_MAX_PIXELS,
     },
   };
 }

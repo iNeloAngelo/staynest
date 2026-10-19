@@ -13,6 +13,7 @@ import { createEventBus } from '../../src/platform/events/index';
 import type { EventBus } from '../../src/platform/events/index';
 import { createLogger } from '../../src/platform/logger/index';
 import type { Mailer } from '../../src/platform/mailer/index';
+import type { MediaStorage } from '../../src/platform/storage/index';
 import type { AuthOptions } from '../../src/modules/auth/index';
 import { usersService } from '../../src/modules/users/index';
 
@@ -73,6 +74,17 @@ export function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       port: 1025,
       from: 'StayNest <no-reply@staynest.local>',
     },
+    storage: overrides.storage ?? {
+      endpoint: 'http://localhost:9000',
+      region: 'us-east-1',
+      bucket: 'staynest-media',
+      accessKey: 'test',
+      secretKey: 'test-secret',
+      publicPath: '/media',
+      maxUploadBytes: 10 * 1024 * 1024,
+      maxPerListing: 20,
+      maxPixels: 40_000_000,
+    },
   };
 }
 
@@ -129,7 +141,10 @@ export async function resetTestSchema(url: string): Promise<Client> {
   return client;
 }
 
-export async function createHarness(overrides: Partial<AppConfig> = {}): Promise<Harness> {
+export async function createHarness(
+  overrides: Partial<AppConfig> = {},
+  storage?: MediaStorage,
+): Promise<Harness> {
   const config = makeConfig(overrides);
   const logger = createLogger('silent', false);
   const db = createDb(databaseUrl ?? '', logger, 5000);
@@ -141,6 +156,7 @@ export async function createHarness(overrides: Partial<AppConfig> = {}): Promise
     mailer: noopMailer,
     events,
     auth: OPEN_AUTH,
+    storage,
   });
 
   return { app, db, config, events, logger };

@@ -12,18 +12,23 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1152.0",
     "@fastify/cookie": "^11.1.3",
     "@fastify/cors": "^11.3.1",
     "@fastify/helmet": "^13.2.0",
+    "@fastify/multipart": "^10.1.4",
     "@node-rs/argon2": "^2.2.2",
     "@staynest/shared": "workspace:*",
+    "blurhash": "^2.0.5",
     "fastify": "^5.12.7",
+    "file-type": "^22.2.0",
     "jose": "^6.2.12",
     "kysely": "^0.29.7",
     "node-pg-migrate": "^9.0.0",
     "nodemailer": "^10.1.7",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
+    "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
   "devDependencies": {

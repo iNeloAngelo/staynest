@@ -1,10 +1,16 @@
 import { sql } from 'kysely';
 import type { Selectable, Updateable } from 'kysely';
 import type { DbExecutor } from '../../platform/db/index';
-import type { Amenities, Listings, ListingType } from '../../platform/db/schema.generated';
+import type {
+  Amenities,
+  Listings,
+  ListingPhotos,
+  ListingType,
+} from '../../platform/db/schema.generated';
 
 export type ListingRow = Selectable<Listings>;
 export type AmenityRow = Selectable<Amenities>;
+export type PhotoRow = Selectable<ListingPhotos>;
 
 export type ListingPatch = Updateable<Listings>;
 
@@ -168,6 +174,42 @@ export async function countPhotos(executor: DbExecutor, listingId: string): Prom
     .executeTakeFirstOrThrow();
 
   return Number(row.count);
+}
+
+export function listListingPhotos(executor: DbExecutor, listingId: string): Promise<PhotoRow[]> {
+  return executor
+    .selectFrom('listing_photos')
+    .selectAll()
+    .where('listing_id', '=', listingId)
+    .orderBy('position', 'asc')
+    .orderBy('created_at', 'asc')
+    .execute();
+}
+
+export function listPhotosForListings(
+  executor: DbExecutor,
+  listingIds: string[],
+): Promise<PhotoRow[]> {
+  if (listingIds.length === 0) return Promise.resolve([]);
+
+  return executor
+    .selectFrom('listing_photos')
+    .selectAll()
+    .where('listing_id', 'in', listingIds)
+    .orderBy('position', 'asc')
+    .orderBy('created_at', 'asc')
+    .execute();
+}
+
+export function listPhotoPrefixes(
+  executor: DbExecutor,
+  listingId: string,
+): Promise<Array<{ storage_prefix: string }>> {
+  return executor
+    .selectFrom('listing_photos')
+    .select('storage_prefix')
+    .where('listing_id', '=', listingId)
+    .execute();
 }
 
 /** Read-only взгляд в таблицу броней: сколько заявок ждут ответа хозяина. */

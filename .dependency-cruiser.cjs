@@ -37,7 +37,8 @@ module.exports = {
     },
   ],
   options: {
-    doNotFollow: { path: 'node_modules' },
+    doNotFollow: { path: 'node_modules|dist|coverage' },
+    exclude: { path: '(^|/)(dist|coverage)/' },
     tsConfig: { fileName: 'tsconfig.base.json' },
     enhancedResolveOptions: {
       exportsFields: ['exports'],

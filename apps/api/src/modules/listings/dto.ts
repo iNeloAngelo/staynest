@@ -1,8 +1,26 @@
-import type { AmenityDto, ListingDto } from '@staynest/shared';
-import type { AmenityRow, ListingRow } from './repo';
+import type { AmenityDto, ListingDto, ListingPhotoDto } from '@staynest/shared';
+import { variantKey } from '../../platform/storage/index';
+import type { MediaStorage } from '../../platform/storage/index';
+import type { AmenityRow, ListingRow, PhotoRow } from './repo';
 
 function numberOrNull(value: string | null): number | null {
   return value === null ? null : Number(value);
+}
+
+function toPhotoDto(row: PhotoRow, storage: MediaStorage): ListingPhotoDto {
+  return {
+    id: row.id,
+    width: row.width,
+    height: row.height,
+    blurhash: row.blurhash,
+    position: row.position,
+    isCover: row.is_cover,
+    urls: {
+      thumb: storage.publicUrl(variantKey(row.storage_prefix, 'thumb')),
+      md: storage.publicUrl(variantKey(row.storage_prefix, 'md')),
+      lg: storage.publicUrl(variantKey(row.storage_prefix, 'lg')),
+    },
+  };
 }
 
 export function toAmenityDto(row: AmenityRow): AmenityDto {
@@ -16,11 +34,15 @@ export function toAmenityDto(row: AmenityRow): AmenityDto {
   };
 }
 
-export function toListingDto(
-  row: ListingRow,
-  amenities: AmenityRow[],
-  pendingBookingsCount: number,
-): ListingDto {
+export function toListingDto(input: {
+  row: ListingRow;
+  photos: PhotoRow[];
+  amenities: AmenityRow[];
+  pendingBookingsCount: number;
+  storage: MediaStorage;
+}): ListingDto {
+  const { row, photos, amenities, pendingBookingsCount, storage } = input;
+
   return {
     id: row.id,
     status: row.status,
@@ -48,6 +70,7 @@ export function toListingDto(
     checkOutTime: row.check_out_time.slice(0, 5),
     houseRules: row.house_rules,
     coverPhotoId: row.cover_photo_id,
+    photos: photos.map((photo) => toPhotoDto(photo, storage)),
     amenities: amenities.map(toAmenityDto),
     pendingBookingsCount,
     createdAt: row.created_at.toISOString(),

@@ -41,6 +41,22 @@ const LISTING_ATTACKS: Attack[] = [
   { name: 'POST публикации', method: 'POST', path: (id) => `/api/v1/listings/${id}/publish` },
   { name: 'POST архива', method: 'POST', path: (id) => `/api/v1/listings/${id}/archive` },
   { name: 'DELETE объявления', method: 'DELETE', path: (id) => `/api/v1/listings/${id}` },
+  {
+    name: 'PATCH порядка фото',
+    method: 'PATCH',
+    path: (id) => `/api/v1/listings/${id}/photos/order`,
+    payload: { photoIds: [] },
+  },
+  {
+    name: 'PATCH обложки фото',
+    method: 'PATCH',
+    path: (id) => `/api/v1/listings/${id}/photos/${randomUUID()}/cover`,
+  },
+  {
+    name: 'DELETE фото',
+    method: 'DELETE',
+    path: (id) => `/api/v1/listings/${id}/photos/${randomUUID()}`,
+  },
 ];
 
 async function setupPair(): Promise<{

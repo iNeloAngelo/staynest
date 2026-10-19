@@ -12,6 +12,7 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:?DOMAIN is required}
+      S3_BUCKET: ${S3_BUCKET:-staynest-media}
     ports:
       - '80:80'
       - '443:443'
