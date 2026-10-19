@@ -142,13 +142,24 @@ mkdir -p /opt/staynest && chown deploy:deploy /opt/staynest
 
 Проверка: вход `deploy` по ключу, `sudo` работает, `ssh root@` и вход по паролю отклоняются, `ufw status` — только 22/80/443, `docker run --rm hello-world` работает от `deploy`.
 
-## 7. Деплой (Сессия 17)
+## 7. Деплой
 
-1. Код на сервере: `git clone` в `/opt/staynest` (или `git pull` по тегу).
-2. `.env` создаётся на сервере из `.env.example`, права `600`. В проде `NODE_ENV=production`, `TRUST_PROXY=true` (API доступен только через Caddy), порт API наружу не публикуется.
+Стенд уже работает: `https://olivertwist95.clodocd.com`. Код лежит в `/opt/staynest`, вход по SSH-ключу пользователем `deploy`, доступ к GitHub — через read-only deploy key (`~deploy/.ssh/github_deploy`), к Docker — через группу `docker`.
+
+1. Код на сервере: `git pull --ff-only` в `/opt/staynest`.
+2. `.env` лежит рядом с репозиторием (права `600`, владелец `deploy`): `NODE_ENV=production`, `TRUST_PROXY=true`, `DOMAIN`, `DATABASE_URL` с хостом `postgres`, `CORS_ORIGINS` с HTTPS-доменом. API и S3 наружу не публикуются.
 3. Сборка образов, миграции **отдельной командой**, затем `docker compose up -d`.
 4. Проверка: `/health` отвечает `ok` с `db: up`, сайт по HTTPS, демо-сценарий.
-5. Бэкап-джоб и проверенное восстановление — до объявления деплоя успешным.
+5. Бэкап-джоб и проверенное восстановление — в Сессии 17, до объявления деплоя полностью готовым.
+
+Выкатка одной командой:
+
+```bash
+ssh staynest
+sudo -u deploy -H bash -lc 'cd /opt/staynest && ./scripts/deploy.sh'
+```
+
+Скрипт делает `git pull`, сборку, поднимает Postgres, применяет миграции (`node dist/migrate.js` внутри образа API) и перезапускает контур. Простой на время пересборки и миграции — секунды-десятки секунд; zero-downtime и откат по тегу остаются в Сессии 17.
 
 ## 8. Доступ агента к серверу и секреты
 
