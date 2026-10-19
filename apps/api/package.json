@@ -16,6 +16,7 @@
     "@fastify/helmet": "^13.2.0",
     "@staynest/shared": "workspace:*",
     "fastify": "^5.12.7",
+    "kysely": "^0.29.7",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "zod": "^4.6.7"
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
+    "node-pg-migrate": "^9.0.0",
     "pino-pretty": "^13.2.0",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",

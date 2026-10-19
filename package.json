@@ -20,7 +20,13 @@
     "knip": "knip",
     "infra:up": "docker compose --env-file .env -f infra/docker-compose.dev.yml up -d",
     "infra:down": "docker compose --env-file .env -f infra/docker-compose.dev.yml down",
-    "infra:logs": "docker compose --env-file .env -f infra/docker-compose.dev.yml logs -f"
+    "infra:logs": "docker compose --env-file .env -f infra/docker-compose.dev.yml logs -f",
+    "db:migrate": "node scripts/db-migrate.mjs up",
+    "db:migrate:down": "node scripts/db-migrate.mjs down",
+    "db:migrate:test": "node scripts/db-migrate.mjs up --test",
+    "db:reset": "node scripts/db-reset.mjs",
+    "db:reset:test": "node scripts/db-reset.mjs --test",
+    "db:codegen": "node scripts/db-codegen.mjs"
   },
   "devDependencies": {
     "@eslint/js": "~9.39.5",
@@ -31,6 +37,9 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "knip": "^6.41.0",
+    "kysely-codegen": "^0.20.0",
+    "node-pg-migrate": "^9.0.0",
+    "pg": "^8.23.1",
     "prettier": "^3.9.10",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.71.2"

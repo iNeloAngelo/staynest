@@ -14,6 +14,7 @@ export default tseslint.config(
       '**/dev-dist/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      'apps/api/src/platform/db/schema.generated.ts',
     ],
   },
   js.configs.recommended,
@@ -59,7 +60,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.cjs'],
+    files: ['**/*.{cjs,mjs}'],
     languageOptions: {
       globals: { ...globals.node },
     },

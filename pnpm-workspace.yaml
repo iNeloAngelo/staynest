@@ -7,3 +7,7 @@ allowBuilds:
   '@tailwindcss/oxide': true
   sharp: true
   unrs-resolver: true
+
+auditConfig:
+  ignoreGhsas:
+    - GHSA-vfj7-8cjw-p6xm

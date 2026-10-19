@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["db/migrations/**"],
   "workspaces": {
     "apps/api": {
       "project": ["src/**/*.ts"],
