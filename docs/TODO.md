@@ -2,7 +2,7 @@
 
 Агент отмечает выполненное, невыполненное переносит в следующую сессию. Backlog внизу.
 
-- [x] **С1** Фундамент: монорепо, docker dev, health, CI
+- [x] **С1** Фундамент: монорепо, docker dev, health, CI (workflow готов; GitHub Actions не запускался — нет remote, см. Backlog)
 - [ ] **С2** БД: миграции, сид, тесты exclusion constraint
 - [ ] **С3** Auth API: register, login, refresh с ротацией, me
 - [ ] **С4** Web-каркас: дизайн-токены, роутинг, auth UI, i18n, режим "ищу/сдаю"

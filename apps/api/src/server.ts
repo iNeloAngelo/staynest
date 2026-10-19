@@ -8,7 +8,7 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel, config.nodeEnv === 'development');
-const db = createDb(config.databaseUrl, logger);
+const db = createDb(config.databaseUrl, logger, config.dbQueryTimeoutMs);
 const app = await buildApp({ config, logger, db });
 
 let shuttingDown = false;
@@ -48,6 +48,16 @@ process.once('SIGINT', () => {
 });
 process.once('SIGTERM', () => {
   void shutdown('SIGTERM');
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error({ code: errorCode(error) }, 'uncaught exception');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ code: errorCode(reason) }, 'unhandled rejection');
+  process.exit(1);
 });
 
 try {

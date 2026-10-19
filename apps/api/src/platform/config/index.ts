@@ -13,6 +13,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1).default('postgres://staynest:staynest@localhost:5433/staynest'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
+  DB_QUERY_TIMEOUT_MS: z.coerce.number().int().positive().max(60_000).default(5000),
 });
 
 type LogLevel = z.infer<typeof logLevelSchema>;
@@ -25,6 +26,7 @@ export type AppConfig = {
   databaseUrl: string;
   corsOrigins: string[];
   trustProxy: boolean;
+  dbQueryTimeoutMs: number;
 };
 
 function loadDotEnvFiles(): void {
@@ -64,5 +66,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       .map((origin) => origin.trim())
       .filter(Boolean),
     trustProxy: data.TRUST_PROXY === 'true',
+    dbQueryTimeoutMs: data.DB_QUERY_TIMEOUT_MS,
   };
 }

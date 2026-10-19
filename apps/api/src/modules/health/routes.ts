@@ -1,5 +1,6 @@
 import type { HealthResponse } from '@staynest/shared';
 import type { FastifyPluginAsync } from 'fastify';
+import packageJson from '../../../package.json';
 import type { Db } from '../../platform/db/index';
 
 export type HealthRoutesOptions = {
@@ -13,7 +14,7 @@ export const healthRoutes: FastifyPluginAsync<HealthRoutesOptions> = async (app,
     const body: HealthResponse = {
       status: dbStatus === 'up' ? 'ok' : 'degraded',
       db: dbStatus,
-      version: process.env['npm_package_version'] ?? '0.1.0',
+      version: packageJson.version,
       uptime: Math.round(process.uptime()),
     };
 

@@ -67,7 +67,23 @@ function problem({ status, code, title, detail, errors }: ProblemInput): Problem
 }
 
 function sendProblem(reply: FastifyReply, input: ProblemInput): void {
-  void reply.status(input.status).type('application/problem+json').send(problem(input));
+  void reply
+    .header('cache-control', 'no-store')
+    .status(input.status)
+    .type('application/problem+json')
+    .send(problem(input));
+}
+
+function logServerError(request: FastifyRequest, error: FastifyError): void {
+  request.log.error(
+    {
+      code: typeof error.code === 'string' ? error.code : 'unknown',
+      name: error.name,
+      // Первая строка стека содержит message, её не логируем: там могут быть DSN/SQL/PII.
+      stack: error.stack?.split('\n').slice(1).join('\n'),
+    },
+    'request failed',
+  );
 }
 
 type AppErrorInput = {
@@ -90,6 +106,10 @@ export class AppError extends Error {
   readonly errors?: unknown;
 
   constructor({ status, code, title, detail, errors }: AppErrorInput) {
+    if (status < 400 || status > 599) {
+      throw new Error('AppError.status должен быть в диапазоне 400–599');
+    }
+
     super(detail);
     this.name = 'AppError';
     this.status = status;
@@ -109,7 +129,7 @@ export function problemErrorHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): void {
-  if (error instanceof AppError) {
+  if (error instanceof AppError && error.status < 500) {
     sendProblem(reply, {
       status: error.status,
       code: error.code,
@@ -124,10 +144,7 @@ export function problemErrorHandler(
     typeof error.statusCode === 'number' && error.statusCode >= 400 ? error.statusCode : 500;
 
   if (status >= 500) {
-    request.log.error(
-      { code: typeof error.code === 'string' ? error.code : 'unknown', name: error.name },
-      'request failed',
-    );
+    logServerError(request, error);
     sendProblem(reply, {
       status: 500,
       code: 'internal_error',

@@ -10,14 +10,14 @@ export type Db = {
   close: () => Promise<void>;
 };
 
-export function createDb(connectionString: string, logger: Logger): Db {
+export function createDb(connectionString: string, logger: Logger, queryTimeoutMs: number): Db {
   const pool = new Pool({
     connectionString,
     max: 10,
     connectionTimeoutMillis: 2000,
     idleTimeoutMillis: 30_000,
-    query_timeout: 2000,
-    statement_timeout: 2000,
+    query_timeout: queryTimeoutMs,
+    statement_timeout: queryTimeoutMs,
   });
 
   pool.on('error', (error) => {

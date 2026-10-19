@@ -13,6 +13,7 @@ const config: AppConfig = {
   databaseUrl: 'postgres://unused',
   corsOrigins: ['http://localhost:5173'],
   trustProxy: false,
+  dbQueryTimeoutMs: 5000,
 };
 
 const logger = createLogger('silent', false);
@@ -123,6 +124,37 @@ describe('GET /api/v1/health', () => {
     expect(response.headers['content-type']).toContain('application/problem+json');
     expect(body).toMatchObject({ status: 400, code: 'bad_request' });
     expect(JSON.stringify(body)).not.toContain('Unexpected');
+
+    await app.close();
+  });
+
+  it('сохраняет errors[] при ошибке валидации схемы', async () => {
+    const app = await appWithDb('up');
+    app.post(
+      '/validate',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            required: ['name'],
+            properties: { name: { type: 'string' } },
+          },
+        },
+      },
+      async (request) => request.body,
+    );
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/validate',
+      headers: { 'content-type': 'application/json' },
+      payload: '{}',
+    });
+    const body = response.json() as { errors?: unknown };
+
+    expect(response.statusCode).toBe(400);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(Array.isArray(body.errors)).toBe(true);
 
     await app.close();
   });
