@@ -17,7 +17,11 @@ function TextFieldsDemo() {
 
   return (
     <>
-      <Input label={t('dev.forms.input')} hint={t('dev.forms.inputHint')} defaultValue="Суздаль" />
+      <Input
+        label={t('dev.forms.input')}
+        hint={t('dev.forms.inputHint')}
+        defaultValue={t('dev.forms.inputValue')}
+      />
 
       <Input
         label={t('dev.forms.inputError')}
@@ -25,7 +29,11 @@ function TextFieldsDemo() {
         defaultValue=""
       />
 
-      <Input label={t('dev.forms.inputDisabled')} disabled defaultValue="Недоступно" />
+      <Input
+        label={t('dev.forms.inputDisabled')}
+        disabled
+        defaultValue={t('dev.forms.inputDisabledValue')}
+      />
 
       <Select
         label={t('dev.forms.select')}
