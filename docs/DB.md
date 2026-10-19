@@ -18,6 +18,7 @@ PostgreSQL 16. Источник правды: SQL-миграции в `db/migrat
 | `0006_availability_and_misc` | блокировки и цены, Telegram, избранное, уведомления, push, платежи, отзывы |
 | `0007_listing_drafts` | незаполненные черновики объявлений: nullable-поля и CHECK полноты для `published`/`archived` |
 | `0008_catalog_search_indexes` | функциональные индексы по `lower(city)` под поиск и сортировку каталога |
+| `0009_booking_engine` | конечные границы `daterange`, индекс pending-заявок гостя, строгий порядок `booking_events` по `id` |
 
 ```bash
 pnpm db:reset        # пересоздать базу разработки: drop schema, миграции, сид
@@ -392,7 +393,11 @@ CREATE TABLE listing_blocks (
   reason      text,
   created_at  timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT listing_blocks_no_overlap
-    EXCLUDE USING gist (listing_id WITH =, block_range WITH &&)
+    EXCLUDE USING gist (listing_id WITH =, block_range WITH &&),
+  CONSTRAINT listing_blocks_finite_range
+    CHECK (NOT lower_inf(block_range) AND NOT upper_inf(block_range)),
+  CONSTRAINT listing_blocks_half_open_range
+    CHECK (lower_inc(block_range) AND NOT upper_inc(block_range))
 );
 ```
 
@@ -448,18 +453,27 @@ CREATE TABLE bookings (
   -- ГЛАВНАЯ ЗАЩИТА: две активные брони одного дома не могут пересекаться по датам
   CONSTRAINT bookings_no_overlap
     EXCLUDE USING gist (listing_id WITH =, stay_range WITH &&)
-    WHERE (status IN ('pending', 'confirmed'))
+    WHERE (status IN ('pending', 'confirmed')),
+  -- Бесконечная бронь даёт NULL в check_out/nights и ломает расчёты (миграция 0009)
+  CONSTRAINT bookings_finite_range
+    CHECK (NOT lower_inf(stay_range) AND NOT upper_inf(stay_range)),
+  -- Модель [): обе границы конечны, левая включена, правая нет
+  CONSTRAINT bookings_half_open_range
+    CHECK (lower_inc(stay_range) AND NOT upper_inc(stay_range))
 );
 CREATE TRIGGER bookings_set_updated_at BEFORE UPDATE ON bookings
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE INDEX bookings_guest_idx         ON bookings (guest_id, created_at DESC);
+CREATE INDEX bookings_guest_pending_idx ON bookings (guest_id) WHERE status = 'pending';
 CREATE INDEX bookings_listing_status_idx ON bookings (listing_id, status, check_in);
 CREATE INDEX bookings_pending_expiry_idx ON bookings (expires_at) WHERE status = 'pending';
 CREATE INDEX bookings_completion_idx     ON bookings (check_out) WHERE status = 'confirmed';
 ```
 
 Конфликт с `listing_blocks` EXCLUDE-ограничение не ловит (разные таблицы). Он проверяется в той же транзакции после блокировки строки объявления (`SELECT ... FROM listings WHERE id = $1 FOR UPDATE`), см. навык `booking-engine` и ADR-005.
+
+PostgreSQL канонизирует дискретный `daterange` к форме `[)`: `daterange('2026-07-10','2026-07-12','[]')` хранится как `[2026-07-10,2026-07-13)`, а `'(]'` — как `[2026-07-11,2026-07-13)`. Поэтому CHECK `half_open_range` для `daterange` всегда истинен, но фиксирует контракт и защищает от будущей замены типа на непрерывный.
 
 ## 11. booking_events — аудит смен статуса
 
@@ -474,6 +488,7 @@ CREATE TABLE booking_events (
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX booking_events_booking_idx ON booking_events (booking_id, created_at);
+CREATE INDEX booking_events_booking_order_idx ON booking_events (booking_id, id);
 ```
 
 ## 12. idempotency_keys — защита от повторов
@@ -491,6 +506,12 @@ CREATE TABLE idempotency_keys (
 );
 CREATE INDEX idempotency_keys_created_idx ON idempotency_keys (created_at);  -- чистка старше 48 часов
 ```
+
+`POST /bookings` требует заголовок `Idempotency-Key`. Хэш считается по
+endpoint и нормализованному телу; повтор с тем же телом возвращает сохранённые
+`response_status`/`response_body`, другое тело даёт `422 idempotency_key_conflict`.
+Ключи старше 48 часов удаляет pg-boss-джоб `bookings.cleanup-idempotency`.
+См. `docs/booking-engine.md`.
 
 ## 13. favorites — избранное
 

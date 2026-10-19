@@ -22,6 +22,7 @@
 - 2026-10-19: создан пользователь `deploy` (sudo + docker, вход по тому же SSH-ключу). Root-доступ по ключу пока оставлен и закрывается в Сессии 17.
 - 2026-10-19: репозиторий склонирован в `/opt/staynest`; доступ к GitHub — read-only deploy key `~deploy/.ssh/github_deploy`, `git pull` работает.
 - 2026-10-19: поднят контур `caddy + api + postgres + silo + mailpit` (`infra/docker-compose.prod.yml`, проект `staynest`). Сайт: `https://olivertwist95.clodocd.com`, TLS Let's Encrypt, наружу только 80/443. Фактическое потребление памяти ~275 МБ.
+- 2026-10-19 (С11): в compose добавлен `worker` (тот же образ, `node dist/worker.js`) для pg-boss-джоб бронирования. При следующем деплое контейнеров станет на один больше; схему `pgboss` создаёт сам pg-boss, в миграциях её нет.
 - Postgres слушает только `127.0.0.1:5433`; базы `staynest` и `staynest_test`. С машины разработчика доступ через SSH-туннель (ADR-027), локальный Docker не используется. Секреты в `/opt/staynest/.env` (600, владелец `deploy`).
 - Деплой одной командой: `scripts/deploy.sh` (git pull, сборка, миграции, перезапуск).
 
