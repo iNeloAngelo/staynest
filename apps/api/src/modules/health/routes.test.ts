@@ -22,6 +22,7 @@ function dbWith(status: 'up' | 'down'): Db {
   return {
     check: async () => status,
     pool: {} as Db['pool'],
+    kysely: {} as Db['kysely'],
     close: async () => undefined,
   };
 }

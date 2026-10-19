@@ -15,6 +15,24 @@ jobs:
   quality:
     name: Lint, types, tests, build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: staynest
+          POSTGRES_PASSWORD: staynest
+          POSTGRES_DB: staynest_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U staynest -d staynest_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Отдельной dev-базы в CI нет: обе переменные смотрят на тестовую.
+      DATABASE_URL: postgres://staynest:staynest@localhost:5432/staynest_test
+      DATABASE_URL_TEST: postgres://staynest:staynest@localhost:5432/staynest_test
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -28,7 +46,13 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm depcheck
       - run: pnpm knip
+      - run: pnpm db:reset:test
+      # Дрейф сгенерированных типов Kysely должен ломать CI (ADR-028).
+      - run: pnpm db:codegen
+      - run: git diff --exit-code -- apps/api/src/platform/db/schema.generated.ts
       - run: pnpm test
+      # Down-миграции проверяются на той же тестовой базе (DoD Сессии 2).
+      - run: pnpm db:migrate:down --test
       - run: pnpm build
 
   security:
@@ -47,4 +71,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # GHSA-vfj7-8cjw-p6xm (braces <=3.0.3, dev-CLI kysely-codegen) принят как риск
+      # и записан в pnpm-workspace.yaml → auditConfig.ignoreGhsas. См. ADR-030.
       - run: pnpm audit --audit-level high
