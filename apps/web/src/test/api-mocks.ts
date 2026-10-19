@@ -1,5 +1,5 @@
+import type { ListingDto, UserDto } from '@staynest/shared';
 import { vi } from 'vitest';
-import type { UserDto } from '@staynest/shared';
 
 export const demoUser: UserDto = {
   id: '3d0f2f4b-8c47-4d0a-9d55-6f8f1f8b5a11',
@@ -11,6 +11,45 @@ export const demoUser: UserDto = {
   emailVerified: true,
   createdAt: '2026-10-19T10:00:00.000Z',
 };
+
+export const demoListing: ListingDto = {
+  id: '0b6f6f46-6a9d-4f6b-8f4a-4f67f5a1b222',
+  status: 'draft',
+  type: 'house',
+  title: null,
+  description: '',
+  country: 'RU',
+  region: null,
+  city: null,
+  addressLine: null,
+  lat: null,
+  lng: null,
+  maxGuests: null,
+  bedrooms: null,
+  beds: null,
+  bathrooms: 1,
+  areaSqm: null,
+  basePriceMinor: null,
+  weekendPriceMinor: null,
+  cleaningFeeMinor: 0,
+  currency: 'RUB',
+  minNights: 1,
+  maxNights: 30,
+  checkInTime: '15:00',
+  checkOutTime: '11:00',
+  houseRules: null,
+  coverPhotoId: null,
+  amenities: [],
+  pendingBookingsCount: 0,
+  createdAt: '2026-10-19T10:00:00.000Z',
+  updatedAt: '2026-10-19T10:00:00.000Z',
+  publishedAt: null,
+};
+
+const demoAmenities = [
+  { id: 1, code: 'wifi', nameRu: 'Wi-Fi', nameEn: 'Wi-Fi', icon: 'wifi', sortOrder: 1 },
+  { id: 2, code: 'sauna', nameRu: 'Сауна', nameEn: 'Sauna', icon: 'flame', sortOrder: 2 },
+];
 
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -24,7 +63,18 @@ export type ApiMockOptions = {
   loginStatus?: number;
   loginBody?: unknown;
   registerBody?: unknown;
+  listings?: ListingDto[];
+  publishStatus?: number;
+  publishBody?: unknown;
   onRequest?: (url: string, init?: RequestInit) => void;
+};
+
+type RouteContext = {
+  url: string;
+  method: string;
+  init: RequestInit | undefined;
+  store: ListingDto[];
+  options: ApiMockOptions;
 };
 
 const SIMPLE_ROUTES: Array<[string, () => Response]> = [
@@ -39,8 +89,7 @@ function sessionResponse(user: UserDto | null): Response {
   return user ? jsonResponse({ user }) : jsonResponse({ code: 'unauthorized' }, 401);
 }
 
-function route(input: RequestInfo | URL, options: ApiMockOptions): Response {
-  const url = String(input);
+function authRoute({ url, options }: RouteContext): Response | null {
   const user = options.user ?? null;
 
   if (url.endsWith('/auth/refresh') || url.endsWith('/me')) return sessionResponse(user);
@@ -56,8 +105,72 @@ function route(input: RequestInfo | URL, options: ApiMockOptions): Response {
     );
   }
 
-  const simple = SIMPLE_ROUTES.find(([suffix]) => url.endsWith(suffix));
+  return null;
+}
 
+function listingId(url: string): string {
+  return url.split('/listings/')[1]?.split('/')[0] ?? demoListing.id;
+}
+
+function currentListing(store: ListingDto[], url: string): ListingDto {
+  return store.find((listing) => listing.id === listingId(url)) ?? demoListing;
+}
+
+function listingGetRoute({ url }: RouteContext): Response | null {
+  if (url.endsWith('/me/listings')) return null;
+  if (url.endsWith('/amenities')) return jsonResponse({ amenities: demoAmenities });
+  return null;
+}
+
+function listingPostRoute({ url, store, options }: RouteContext): Response | null {
+  if (url.endsWith('/listings')) {
+    const listing = { ...demoListing, id: `listing-${store.length + 1}` };
+    store.unshift(listing);
+    return jsonResponse({ listing }, 201);
+  }
+
+  if (url.endsWith('/publish')) {
+    if (options.publishBody) {
+      return jsonResponse(options.publishBody, options.publishStatus ?? 422);
+    }
+    return jsonResponse({ listing: { ...demoListing, status: 'published' } });
+  }
+
+  if (url.endsWith('/archive')) {
+    return jsonResponse({ listing: { ...demoListing, status: 'archived' } });
+  }
+
+  return null;
+}
+
+function listingPatchRoute({ url, init, store }: RouteContext): Response | null {
+  if (!url.includes('/listings/')) return null;
+
+  const current = currentListing(store, url);
+  if (init?.body) Object.assign(current, JSON.parse(String(init.body)) as Partial<ListingDto>);
+  return jsonResponse({ listing: current });
+}
+
+function listingsRoute(ctx: RouteContext): Response | null {
+  if (ctx.url.endsWith('/me/listings')) return jsonResponse({ listings: ctx.store });
+
+  if (ctx.method === 'GET') return listingGetRoute(ctx);
+  if (ctx.method === 'POST') return listingPostRoute(ctx);
+  if (ctx.method === 'PUT') return jsonResponse({ listing: ctx.store[0] ?? demoListing });
+  if (ctx.method === 'PATCH') return listingPatchRoute(ctx);
+  if (ctx.method === 'DELETE') return new Response(null, { status: 204 });
+
+  return null;
+}
+
+function route(ctx: RouteContext): Response {
+  const auth = authRoute(ctx);
+  if (auth) return auth;
+
+  const listing = listingsRoute(ctx);
+  if (listing) return listing;
+
+  const simple = SIMPLE_ROUTES.find(([suffix]) => ctx.url.endsWith(suffix));
   return simple ? simple[1]() : jsonResponse({ code: 'not_found' }, 404);
 }
 
@@ -66,9 +179,11 @@ function route(input: RequestInfo | URL, options: ApiMockOptions): Response {
  * Логин по умолчанию успешен и возвращает demoUser.
  */
 export function mockApi(options: ApiMockOptions = {}): ReturnType<typeof vi.fn> {
+  const store = [...(options.listings ?? [])];
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     options.onRequest?.(String(input), init);
-    return Promise.resolve(route(input, options));
+    const method = (init?.method ?? 'GET').toUpperCase();
+    return Promise.resolve(route({ url: String(input), method, init, store, options }));
   });
 
   vi.stubGlobal('fetch', fetchMock);

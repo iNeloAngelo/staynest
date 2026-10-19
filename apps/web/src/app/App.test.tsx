@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ModeProvider } from '../features/mode-switch';
 import { ToastProvider } from '../shared/ui';
-import { demoUser, mockApi } from '../test/api-mocks';
+import { demoListing, demoUser, mockApi } from '../test/api-mocks';
 import { App } from './App';
 
 function renderApp(initialEntries: string[]) {
@@ -196,5 +196,62 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Войти' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Неверный email или пароль.');
+  });
+
+  it('показывает статусы моих объявлений', async () => {
+    mockApi({
+      user: demoUser,
+      listings: [
+        {
+          ...demoListing,
+          status: 'published',
+          title: 'Дом у озера',
+          city: 'Суздаль',
+          basePriceMinor: 750_000,
+        },
+      ],
+    });
+    renderApp(['/host/listings']);
+
+    expect(await screen.findByText('Дом у озера')).toBeInTheDocument();
+    expect(screen.getByText('Опубликовано')).toBeInTheDocument();
+    expect(screen.getByText(/Суздаль/)).toBeInTheDocument();
+  });
+
+  it('создаёт черновик и открывает редактор', async () => {
+    mockApi({ user: demoUser, listings: [] });
+    const user = userEvent.setup();
+    renderApp(['/host/listings']);
+
+    expect(await screen.findByText('Пока нет объявлений')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: 'Создать объявление' })[0]!);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Новое объявление', level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Название')).toBeInTheDocument();
+  });
+
+  it('показывает ошибки публикации из ответа сервера', async () => {
+    mockApi({
+      user: demoUser,
+      listings: [{ ...demoListing, title: 'Дом у озера' }],
+      publishStatus: 422,
+      publishBody: {
+        code: 'listing_incomplete',
+        detail: 'Заполните обязательные поля.',
+        errors: [
+          { field: 'photos', code: 'photos_too_few', message: 'Добавьте минимум 3 фотографии.' },
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    renderApp([`/host/listings/${demoListing.id}`]);
+
+    await screen.findByLabelText('Название');
+    await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
+
+    expect(await screen.findByText('Пока нельзя опубликовать')).toBeInTheDocument();
+    expect(screen.getByText('Добавьте минимум 3 фотографии.')).toBeInTheDocument();
   });
 });

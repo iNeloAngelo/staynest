@@ -6,6 +6,7 @@ import { HomePage } from '../pages/home/HomePage';
 import { HostCalendarPage } from '../pages/host-calendar/HostCalendarPage';
 import { HostListingsPage } from '../pages/host-listings/HostListingsPage';
 import { HostRequestsPage } from '../pages/host-requests/HostRequestsPage';
+import { ListingEditorPage } from '../pages/listing-editor/ListingEditorPage';
 import { LoginPage } from '../pages/login/LoginPage';
 import { NotFoundPage } from '../pages/not-found/NotFoundPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
@@ -39,6 +40,7 @@ export function App() {
           <Route path="trips" element={<TripsPage />} />
           <Route path="favorites" element={<FavoritesPage />} />
           <Route path="host/listings" element={<HostListingsPage />} />
+          <Route path="host/listings/:id" element={<ListingEditorPage />} />
           <Route path="host/requests" element={<HostRequestsPage />} />
           <Route path="host/calendar" element={<HostCalendarPage />} />
         </Route>
