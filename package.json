@@ -26,7 +26,8 @@
     "db:migrate:test": "node scripts/db-migrate.mjs up --test",
     "db:reset": "node scripts/db-reset.mjs",
     "db:reset:test": "node scripts/db-reset.mjs --test",
-    "db:codegen": "node scripts/db-codegen.mjs"
+    "db:codegen": "node scripts/db-codegen.mjs",
+    "icons:generate": "node scripts/generate-pwa-icons.mjs"
   },
   "devDependencies": {
     "@eslint/js": "~9.39.5",

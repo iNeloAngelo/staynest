@@ -1,50 +1,61 @@
-import type { HealthResponse } from '@staynest/shared';
-import { useQuery } from '@tanstack/react-query';
+import { Suspense, lazy } from 'react';
+import { Route, Routes } from 'react-router-dom';
+import { FavoritesPage } from '../pages/favorites/FavoritesPage';
+import { ForgotPasswordPage } from '../pages/forgot-password/ForgotPasswordPage';
+import { HomePage } from '../pages/home/HomePage';
+import { HostCalendarPage } from '../pages/host-calendar/HostCalendarPage';
+import { HostListingsPage } from '../pages/host-listings/HostListingsPage';
+import { HostRequestsPage } from '../pages/host-requests/HostRequestsPage';
+import { LoginPage } from '../pages/login/LoginPage';
+import { NotFoundPage } from '../pages/not-found/NotFoundPage';
+import { ProfilePage } from '../pages/profile/ProfilePage';
+import { RegisterPage } from '../pages/register/RegisterPage';
+import { ResetPasswordPage } from '../pages/reset-password/ResetPasswordPage';
+import { TripsPage } from '../pages/trips/TripsPage';
+import { VerifyEmailPage } from '../pages/verify-email/VerifyEmailPage';
+import { AppLayout } from './layouts/AppLayout';
+import { AuthLayout } from './layouts/AuthLayout';
+import { PageLoading } from './routes/PageLoading';
+import { RequireAuth } from './routes/RequireAuth';
 
-async function fetchHealth(): Promise<HealthResponse> {
-  const response = await fetch('/api/v1/health');
-
-  if (!response.ok) {
-    throw new Error(`API ответил ${response.status}`);
-  }
-
-  return (await response.json()) as HealthResponse;
-}
+const DevUiPage = import.meta.env.DEV ? lazy(() => import('../pages/dev-ui/DevUiPage')) : null;
 
 export function App() {
-  const health = useQuery({ queryKey: ['health'], queryFn: fetchHealth });
-
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-6 px-4 py-12">
-      <p className="text-sm font-semibold tracking-wide text-primary uppercase">StayNest</p>
+    <Routes>
+      <Route element={<AuthLayout />}>
+        <Route path="login" element={<LoginPage />} />
+        <Route path="register" element={<RegisterPage />} />
+        <Route path="verify-email" element={<VerifyEmailPage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
+      </Route>
 
-      <h1 className="font-serif text-4xl leading-tight text-ink">Дом, который ждёт вас</h1>
+      <Route element={<AppLayout />}>
+        <Route index element={<HomePage />} />
 
-      <p className="max-w-prose text-base leading-relaxed text-ink-muted">
-        Каркас приложения готов. Каталог домов, календарь свободных дат и бронирование появятся в
-        следующих сессиях.
-      </p>
+        <Route element={<RequireAuth />}>
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="trips" element={<TripsPage />} />
+          <Route path="favorites" element={<FavoritesPage />} />
+          <Route path="host/listings" element={<HostListingsPage />} />
+          <Route path="host/requests" element={<HostRequestsPage />} />
+          <Route path="host/calendar" element={<HostCalendarPage />} />
+        </Route>
 
-      <section
-        aria-live="polite"
-        className="rounded-lg border border-border bg-surface p-4 shadow-sm"
-      >
-        <h2 className="text-sm font-semibold text-ink">Состояние API</h2>
-
-        {health.isPending ? <p className="mt-2 text-sm text-ink-muted">Проверяем…</p> : null}
-
-        {health.isError ? (
-          <p className="mt-2 text-sm text-danger">
-            API недоступен. Запустите <code>pnpm dev</code> и обновите страницу.
-          </p>
+        {DevUiPage ? (
+          <Route
+            path="dev/ui"
+            element={
+              <Suspense fallback={<PageLoading />}>
+                <DevUiPage />
+              </Suspense>
+            }
+          />
         ) : null}
 
-        {health.data ? (
-          <p className="mt-2 text-sm text-ink">
-            Статус: {health.data.status}, база: {health.data.db}, версия: {health.data.version}
-          </p>
-        ) : null}
-      </section>
-    </main>
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
   );
 }

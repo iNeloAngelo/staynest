@@ -1,18 +1,12 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import '@fontsource-variable/lora';
+import '@fontsource-variable/manrope';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './app/App';
+import { AppProviders } from './app/AppProviders';
+import './shared/i18n';
 import './styles.css';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-    },
-  },
-});
 
 const rootElement = document.getElementById('root');
 
@@ -20,12 +14,12 @@ if (!rootElement) {
   throw new Error('Не найден корневой элемент #root');
 }
 
-ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
+createRoot(rootElement).render(
+  <StrictMode>
+    <AppProviders>
       <BrowserRouter>
         <App />
       </BrowserRouter>
-    </QueryClientProvider>
-  </React.StrictMode>,
+    </AppProviders>
+  </StrictMode>,
 );
