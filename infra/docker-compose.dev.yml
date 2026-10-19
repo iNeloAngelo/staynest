@@ -9,8 +9,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staynest}
       POSTGRES_DB: ${POSTGRES_DB:-staynest}
     ports:
-      # 5433 на хосте: 5432 часто занят локальным Postgres
-      - '5433:5432'
+      # 5433 на хосте: 5432 часто занят локальным Postgres.
+      # Только loopback: Docker обходит UFW, наружу порт публиковать нельзя.
+      - '127.0.0.1:5433:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -27,8 +28,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-staynest}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-staynest-minio}
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
     volumes:
       - minio-data:/data
     healthcheck:
@@ -41,8 +42,8 @@ services:
     # axllent/mailpit:latest, digest на 2026-10-19
     image: axllent/mailpit@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
     ports:
-      - '1025:1025'
-      - '8025:8025'
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025'
     healthcheck:
       test: ['CMD-SHELL', 'wget -q --spider http://localhost:8025/livez || exit 1']
       interval: 10s

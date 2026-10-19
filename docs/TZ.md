@@ -193,7 +193,7 @@ stateDiagram-v2
 - **Качество кода:** strict TypeScript, ESLint, Prettier, CI (lint, typecheck, test, build) на каждый push.
 
 ## 10. Окружения
-- **dev:** `docker compose -f infra/docker-compose.dev.yml up` поднимает Postgres и MinIO; API и web запускаются локально.
+- **dev:** `docker compose -f infra/docker-compose.dev.yml up` поднимает Postgres и MinIO; API и web запускаются локально. В текущем окружении Postgres вынесен на VPS и доступен через SSH-туннель (ADR-027), локальный compose остаётся альтернативой.
 - **prod:** `infra/docker-compose.prod.yml`: caddy, api, worker (тот же образ api с другой командой), postgres, minio. Домен и TLS через Caddy. Переменные из `.env` на сервере.
 - **Миграции:** применяются отдельной командой при деплое, не при старте API.
 

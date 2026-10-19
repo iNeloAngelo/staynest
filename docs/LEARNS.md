@@ -12,9 +12,22 @@
 - **SSE за прокси.** Нужны heartbeat и отключённая буферизация, иначе соединение рвётся. В Caddy использовать `flush_interval -1` для маршрута SSE.
 - **sharp в Docker.** Использовать образ на glibc (debian/bookworm-slim) или проверить сборку на alpine; следить за версией libvips.
 - **Тесты на Postgres.** Параллельный запуск тестовых файлов на одной базе даёт гонки: отдельная схема или база на воркер, либо последовательный запуск интеграционных тестов.
+- **Docker обходит UFW.** Порт, опубликованный как `5433:5432`, слушает `0.0.0.0` и доступен извне даже при запрете в UFW. Публиковать только на `127.0.0.1`, а доступ с машины разработчика делать через SSH-туннель (ADR-027).
 - **Cookie в dev.** Frontend и API на разных портах: настроить прокси Vite на `/api`, чтобы cookie были same-site.
 
 ## Журнал
+
+### 2026-10-19 / Сессия 2 / схема БД
+- **Root-скриптам нужны свои зависимости.** В pnpm root `scripts/*.mjs` не видят `pg` из `apps/api`. Пришлось добавить `pg` и `node-pg-migrate` в devDependencies корня. `kysely-codegen` запускается через `process.execPath` + `require.resolve` (без shell), поэтому knip видит его как используемый.
+- **`.mjs` — не TypeScript.** ESLint не применяет к ним блок с `globals.node` для `*.ts`, поэтому `process` и `URL` падали с `no-undef`. Добавлен блок `**/*.{cjs,mjs}`.
+- **node-pg-migrate 9 грузит ESM-миграции через jiti.** Обычные `.js` с `export const up/down` работают без ts-node и без сборки.
+- **kysely-codegen видит служебную таблицу.** `pgmigrations` попадает в типы, если не передать `--exclude-pattern pgmigrations`.
+- **Сгенерированные типы ломают линтеры.** Файл на 277 строк близок к лимиту `max-lines` и не должен правиться вручную; исключён из ESLint и Prettier (ADR-028).
+- **`pg` парсит DATE в `Date`.** По умолчанию `'2026-07-10'::date` превращается в `2026-07-09T21:00:00.000Z` (UTC+3) и при сериализации даёт предыдущий день. В пуле задан парсер OID 1082, возвращающий строку; `kysely-codegen` запускается с `--date-parser string`. Тест ловит регрессию через Kysely.
+- **`pnpm audit` падает на dev-зависимости.** `kysely-codegen` тянет `braces@3.0.3` с advisory без патча (stack exhaustion на глубоких glob-паттернах). Риск ограничен локальным CLI на доверенных именах таблиц; advisory явно проигнорирован в CI с обоснованием (ADR-030), пересмотреть при обновлении codegen.
+- **`DROP SCHEMA public CASCADE` удаляет и расширения.** `btree_gist`, `citext`, `pg_trgm` приходится создавать заново — это делает первая миграция, поэтому `db:reset` корректен.
+- **Windows и `spawn`.** `spawnSync('pnpm', ..., { shell: true })` даёт DeprecationWarning и риск инъекции; правильнее `pnpm.cmd` без shell.
+- **Тестовая база одна на все файлы.** Между тестами нужен `TRUNCATE ... RESTART IDENTITY CASCADE`, а файлы запускаются последовательно (ADR-029).
 
 ### 2026-10-19 / Сессия 1 / фундамент
 - **MinIO больше не раздаёт образы.** `minio/minio` удалён с Docker Hub, `quay.io/minio/minio` отдаёт 401. В dev и prod используем совместимый форк `pgsty/silo`, закреплённый по digest. Код работает через S3-клиент, поэтому замена образа не влияет на приложение. См. ADR-021.
@@ -22,7 +35,7 @@
 - **TypeScript 7 и ESLint 10 опередили экосистему.** `typescript-eslint` требует TS `<6.1`, `eslint-plugin-jsx-a11y` 6.10 — ESLint `<=9`. Зафиксировали TS 5.9.3 и ESLint 9.39.5; обновлять после поддержки плагинами.
 - **Vite 8 на Windows слушает только `::1`.** `localhost:5173` не открывался по IPv4. Помогает явный `server.host: '127.0.0.1'` в `vite.config.ts`.
 - **Порты на машине разработчика заняты.** 5432 использует другой Postgres, 3000 — Grafana. Dev-порты: API 3100, Postgres 5433. См. ADR-022.
-- **Docker Desktop не запускается сам.** Перед `pnpm infra:up` нужно открыть Docker Desktop и дождаться `docker info`. В CI Docker не нужен, тесты API не ходят в базу.
+- **Docker Desktop не запускается сам.** Перед `pnpm infra:up` нужно открыть Docker Desktop и дождаться `docker info`. Юнит-тесты API не ходят в базу; интеграционные тесты схемы требуют Postgres (ADR-029).
 - **knip не видит динамические зависимости.** `pino-pretty` подключается строкой в `transport.target`, `tailwindcss` — через `@import` в CSS. Для pino-pretty добавлен `ignoreDependencies`, CSS добавлен в `project`, чтобы Tailwind определялся.
 - **Проверка границ модулей.** Временный импорт `modules/health → modules/tempfoo/service.ts` ломает `pnpm depcheck` правилом `modules-only-via-index`; после удаления файлов проверка снова зелёная.
 - **SSH: порядок Include важнее номера файла.** В `sshd_config` первый полученный параметр побеждает, поэтому override нужно называть `00-staynest.conf`, а не `99-...`, иначе `40-hosting.conf` оставит `PasswordAuthentication yes`.

@@ -4,6 +4,29 @@ PostgreSQL 16. Источник правды: SQL-миграции в `db/migrat
 
 Принципы: PK `uuid` (`gen_random_uuid()`), время `timestamptz`, даты проживания `date`/`daterange` с границами `[)`, деньги `bigint` в копейках + `currency char(3)`, мягкое удаление только у `users`.
 
+## Миграции
+
+Файлы в `db/migrations` применяются по порядку номеров, каждая миграция имеет `up` и `down`:
+
+| Файл | Содержимое |
+|---|---|
+| `0001_extensions_and_types` | расширения `btree_gist`, `citext`, `pg_trgm`, перечисления, `set_updated_at()` |
+| `0002_users_and_tokens` | `users`, `refresh_tokens`, `auth_tokens` |
+| `0003_amenities` | справочник удобств + идемпотентный сид 14 записей |
+| `0004_listings` | `listings`, `listing_amenities`, `listing_photos`, внешний ключ обложки |
+| `0005_bookings_and_audit` | `bookings` с EXCLUDE, `booking_events`, `idempotency_keys` |
+| `0006_availability_and_misc` | блокировки и цены, Telegram, избранное, уведомления, push, платежи, отзывы |
+
+```bash
+pnpm db:reset        # пересоздать базу разработки: drop schema, миграции, сид
+pnpm db:reset:test   # то же для базы интеграционных тестов
+pnpm db:migrate      # применить недостающие миграции
+pnpm db:migrate:down # откатить все миграции
+pnpm db:codegen      # пересобрать типы Kysely в apps/api/src/platform/db/schema.generated.ts
+```
+
+Служебная таблица `pgmigrations` создаётся node-pg-migrate и в доменную схему не входит.
+
 ## ER-диаграмма
 
 ```mermaid
@@ -262,7 +285,7 @@ CREATE INDEX listings_search_tsv_idx   ON listings USING gin (search_tsv);
 CREATE INDEX listings_city_trgm_idx    ON listings USING gin (city gin_trgm_ops);
 ```
 
-Примечание: `cover_photo_id` добавляется внешним ключом на `listing_photos(id)` отдельной миграцией после создания `listing_photos` (циклическая зависимость), `ON DELETE SET NULL`.
+Примечание: `cover_photo_id` получает внешний ключ на `listing_photos(id)` в той же миграции `0004` после создания `listing_photos` (циклическая зависимость), `ON DELETE SET NULL`.
 
 ## 6. listing_amenities — удобства объявления
 
