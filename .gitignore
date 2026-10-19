@@ -1,0 +1,38 @@
+# Secrets — никогда не коммитим
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.ppk
+id_rsa*
+id_ed25519*
+*.p12
+secrets/
+.ssh/
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Vite / PWA
+.vite/
+dev-dist/
+
+# Локальные артефакты и отчёты
+*.log
+tmp/
+.playwright/
+test-results/
+playwright-report/
+
+# ОС и редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
