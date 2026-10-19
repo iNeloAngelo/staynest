@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    "apps/api": {
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["pino-pretty"]
+    },
+    "apps/web": {
+      "project": ["src/**/*.{ts,tsx,css}"]
+    },
+    "packages/shared": {
+      "project": ["src/**/*.ts"]
+    }
+  }
+}
