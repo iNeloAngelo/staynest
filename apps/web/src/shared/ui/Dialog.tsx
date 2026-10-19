@@ -87,6 +87,30 @@ function useDialogFocus(open: boolean, onClose: () => void): RefObject<HTMLDivEl
   return panelRef;
 }
 
+function DialogHeader({
+  title,
+  titleId,
+  onClose,
+}: {
+  title: string;
+  titleId: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <header className="flex items-start justify-between gap-4 px-6 pt-5 pb-3">
+      <h2 id={titleId} className="text-h2 text-ink">
+        {title}
+      </h2>
+
+      <IconButton label={t('ui.modal.close')} onClick={onClose} className="-mt-2 -mr-2">
+        <X className="size-5" aria-hidden="true" />
+      </IconButton>
+    </header>
+  );
+}
+
 type DialogShellProps = {
   open: boolean;
   onClose: () => void;
@@ -94,9 +118,19 @@ type DialogShellProps = {
   children: ReactNode;
   footer?: ReactNode;
   variant: 'modal' | 'sheet';
+  /** Полноэкранная нижняя панель: например, расширенные фильтры каталога. */
+  fullHeight?: boolean;
 };
 
-export function DialogShell({ open, onClose, title, children, footer, variant }: DialogShellProps) {
+export function DialogShell({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  variant,
+  fullHeight = false,
+}: DialogShellProps) {
   const { t } = useTranslation();
   const panelRef = useDialogFocus(open, onClose);
   const titleId = useId();
@@ -126,9 +160,11 @@ export function DialogShell({ open, onClose, title, children, footer, variant }:
         tabIndex={-1}
         className={cn(
           'relative flex max-h-[90dvh] w-full flex-col overflow-hidden bg-surface shadow-lg',
-          variant === 'sheet'
-            ? 'animate-sheet max-w-lg rounded-t-lg pb-safe'
-            : 'animate-dialog rounded-t-lg pb-safe sm:max-w-lg sm:rounded-lg sm:pb-0',
+          variant === 'sheet' && fullHeight
+            ? 'animate-sheet h-dvh max-h-dvh max-w-none rounded-none pb-safe'
+            : variant === 'sheet'
+              ? 'animate-sheet max-w-lg rounded-t-lg pb-safe'
+              : 'animate-dialog rounded-t-lg pb-safe sm:max-w-lg sm:rounded-lg sm:pb-0',
         )}
       >
         {variant === 'sheet' ? (
@@ -138,15 +174,7 @@ export function DialogShell({ open, onClose, title, children, footer, variant }:
           />
         ) : null}
 
-        <header className="flex items-start justify-between gap-4 px-6 pt-5 pb-3">
-          <h2 id={titleId} className="text-h2 text-ink">
-            {title}
-          </h2>
-
-          <IconButton label={t('ui.modal.close')} onClick={onClose} className="-mt-2 -mr-2">
-            <X className="size-5" aria-hidden="true" />
-          </IconButton>
-        </header>
+        <DialogHeader title={title} titleId={titleId} onClose={onClose} />
 
         <div className="overflow-y-auto px-6 pb-4 text-body text-ink-muted">{children}</div>
 

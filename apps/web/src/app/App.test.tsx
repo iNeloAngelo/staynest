@@ -1,11 +1,17 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ModeProvider } from '../features/mode-switch';
 import { ToastProvider } from '../shared/ui';
-import { completeListing, demoListing, demoUser, mockApi } from '../test/api-mocks';
+import {
+  completeListing,
+  demoListing,
+  demoPublicListing,
+  demoUser,
+  mockApi,
+} from '../test/api-mocks';
 import { App } from './App';
 
 function renderApp(initialEntries: string[]) {
@@ -42,11 +48,149 @@ describe('App', () => {
 
     expect(await screen.findByRole('link', { name: 'Войти' })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Переключить язык' }));
+    await userEvent.click(screen.getByRole('button', { name: /Переключить язык/ }));
 
     expect(
       await screen.findByRole('heading', { name: /a home that waits for you/i, level: 1 }),
     ).toBeInTheDocument();
+  });
+
+  it('показывает каталог и передаёт фильтры из URL в API', async () => {
+    const requests: string[] = [];
+    mockApi({
+      onRequest: (url) => {
+        if (url.includes('/listings?')) requests.push(url);
+      },
+    });
+
+    renderApp(['/?city=Суздаль&guests=2']);
+
+    expect(
+      await screen.findByRole('heading', { name: /дом у озера/i, level: 3 }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Город')).toHaveValue('Суздаль');
+
+    const catalogRequest = decodeURIComponent(requests.at(-1) ?? '');
+    expect(catalogRequest).toContain('city=Суздаль');
+    expect(catalogRequest).toContain('guests=2');
+  });
+
+  it('передаёт в API все фильтры из ссылки', async () => {
+    const requests: string[] = [];
+    mockApi({
+      onRequest: (url) => {
+        if (url.includes('/listings?')) requests.push(url);
+      },
+    });
+
+    renderApp([
+      '/?q=%D0%BE%D0%B7%D0%B5%D1%80%D0%BE&priceMin=500000&priceMax=900000&bedroomsMin=2&type=house%2Cvilla&amenities=1&sort=price_asc',
+    ]);
+
+    await screen.findByRole('heading', { name: /дом у озера/i, level: 3 });
+    await waitFor(() => {
+      const request = decodeURIComponent(requests.at(-1) ?? '');
+      expect(request).toContain('q=озеро');
+      expect(request).toContain('priceMin=500000');
+      expect(request).toContain('priceMax=900000');
+      expect(request).toContain('bedroomsMin=2');
+      expect(request).toContain('type=house,villa');
+      expect(request).toContain('amenities=1');
+      expect(request).toContain('sort=price_asc');
+    });
+  });
+
+  it('показывает цену фильтра в рублях и отправляет копейки', async () => {
+    const requests: string[] = [];
+    mockApi({
+      onRequest: (url) => {
+        if (url.includes('/listings?')) requests.push(url);
+      },
+    });
+    const user = userEvent.setup();
+    renderApp(['/?priceMax=750000']);
+
+    const max = await screen.findByLabelText('До');
+    expect(max).toHaveValue('7500');
+
+    await user.clear(max);
+    await user.type(max, '8000');
+
+    await waitFor(() => {
+      expect(decodeURIComponent(requests.at(-1) ?? '')).toContain('priceMax=800000');
+    });
+  });
+
+  it('меняет сортировку и запрашивает выдачу заново', async () => {
+    const requests: string[] = [];
+    mockApi({
+      onRequest: (url) => {
+        if (url.includes('/listings?')) requests.push(url);
+      },
+    });
+    const user = userEvent.setup();
+    renderApp(['/?city=%D0%A1%D1%83%D0%B7%D0%B4%D0%B0%D0%BB%D1%8C']);
+
+    const sort = await screen.findByLabelText('Сортировка');
+    await user.selectOptions(sort, 'price_desc');
+
+    await waitFor(() => {
+      expect(decodeURIComponent(requests.at(-1) ?? '')).toContain('sort=price_desc');
+    });
+  });
+
+  it('запрашивает подсказки города после двух символов', async () => {
+    const requests: string[] = [];
+    mockApi({
+      onRequest: (url) => {
+        requests.push(url);
+      },
+    });
+    const user = userEvent.setup();
+    renderApp(['/']);
+
+    const city = await screen.findByLabelText('Город');
+    await user.type(city, 'Су');
+
+    await waitFor(() => {
+      expect(requests.some((url) => url.includes('/cities?'))).toBe(true);
+    });
+  });
+
+  it('открывает карточку дома без точного адреса', async () => {
+    mockApi();
+    renderApp([`/listings/${demoPublicListing.id}`]);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Дом у озера', level: 1 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Wi-Fi')).toBeInTheDocument();
+    expect(screen.getByText('Сауна')).toBeInTheDocument();
+    expect(screen.getAllByText(/за ночь/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Курить нельзя. С животными — по договорённости.')).toBeInTheDocument();
+    expect(screen.queryByText(/Частный адрес/)).not.toBeInTheDocument();
+  });
+
+  it('показывает пустую выдачу и сбрасывает фильтры', async () => {
+    mockApi({ catalogListings: [] });
+    const user = userEvent.setup();
+    renderApp(['/?city=Москва']);
+
+    expect(await screen.findByText('Ничего не найдено')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: 'Сбросить фильтры' })[0]!);
+
+    expect(screen.getByLabelText('Город')).toHaveValue('');
+  });
+
+  it('открывает фильтры в нижней панели на мобильном', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderApp(['/']);
+
+    await screen.findByRole('heading', { name: /дом, который ждёт вас/i, level: 1 });
+    await user.click(screen.getAllByRole('button', { name: 'Фильтры' })[0]!);
+
+    expect(await screen.findByRole('dialog', { name: 'Фильтры' })).toBeInTheDocument();
   });
 
   it('переключает режим и нижнюю навигацию', async () => {
@@ -124,7 +268,7 @@ describe('App', () => {
     renderApp(['/register']);
 
     await screen.findByRole('heading', { name: 'Создайте аккаунт', level: 1 });
-    await user.click(screen.getByRole('button', { name: 'Переключить язык' }));
+    await user.click(screen.getByRole('button', { name: /Переключить язык/ }));
 
     await user.type(await screen.findByLabelText('Name'), 'Anna');
     await user.type(screen.getByLabelText('Email'), 'anna@example.com');

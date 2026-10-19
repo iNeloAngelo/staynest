@@ -7,6 +7,7 @@ import { HostCalendarPage } from '../pages/host-calendar/HostCalendarPage';
 import { HostListingsPage } from '../pages/host-listings/HostListingsPage';
 import { HostRequestsPage } from '../pages/host-requests/HostRequestsPage';
 import { ListingEditorPage } from '../pages/listing-editor/ListingEditorPage';
+import { ListingPage } from '../pages/listing/ListingPage';
 import { LoginPage } from '../pages/login/LoginPage';
 import { NotFoundPage } from '../pages/not-found/NotFoundPage';
 import { ProfilePage } from '../pages/profile/ProfilePage';
@@ -18,46 +19,51 @@ import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { PageLoading } from './routes/PageLoading';
 import { RequireAuth } from './routes/RequireAuth';
+import { ScrollToTop } from './routes/ScrollToTop';
 
 const DevUiPage = import.meta.env.DEV ? lazy(() => import('../pages/dev-ui/DevUiPage')) : null;
 
 export function App() {
   return (
-    <Routes>
-      <Route element={<AuthLayout />}>
-        <Route path="login" element={<LoginPage />} />
-        <Route path="register" element={<RegisterPage />} />
-        <Route path="verify-email" element={<VerifyEmailPage />} />
-        <Route path="forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="reset-password" element={<ResetPasswordPage />} />
-      </Route>
-
-      <Route element={<AppLayout />}>
-        <Route index element={<HomePage />} />
-
-        <Route element={<RequireAuth />}>
-          <Route path="profile" element={<ProfilePage />} />
-          <Route path="trips" element={<TripsPage />} />
-          <Route path="favorites" element={<FavoritesPage />} />
-          <Route path="host/listings" element={<HostListingsPage />} />
-          <Route path="host/listings/:id" element={<ListingEditorPage />} />
-          <Route path="host/requests" element={<HostRequestsPage />} />
-          <Route path="host/calendar" element={<HostCalendarPage />} />
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route element={<AuthLayout />}>
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password" element={<ResetPasswordPage />} />
         </Route>
 
-        {DevUiPage ? (
-          <Route
-            path="dev/ui"
-            element={
-              <Suspense fallback={<PageLoading />}>
-                <DevUiPage />
-              </Suspense>
-            }
-          />
-        ) : null}
+        <Route element={<AppLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="listings/:id" element={<ListingPage />} />
 
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
+          <Route element={<RequireAuth />}>
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="trips" element={<TripsPage />} />
+            <Route path="favorites" element={<FavoritesPage />} />
+            <Route path="host/listings" element={<HostListingsPage />} />
+            <Route path="host/listings/:id" element={<ListingEditorPage />} />
+            <Route path="host/requests" element={<HostRequestsPage />} />
+            <Route path="host/calendar" element={<HostCalendarPage />} />
+          </Route>
+
+          {DevUiPage ? (
+            <Route
+              path="dev/ui"
+              element={
+                <Suspense fallback={<PageLoading />}>
+                  <DevUiPage />
+                </Suspense>
+              }
+            />
+          ) : null}
+
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
+    </>
   );
 }

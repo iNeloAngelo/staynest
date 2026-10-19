@@ -7,6 +7,7 @@ export type BottomSheetProps = {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  fullHeight?: boolean;
 };
 
 export function BottomSheet(props: BottomSheetProps) {

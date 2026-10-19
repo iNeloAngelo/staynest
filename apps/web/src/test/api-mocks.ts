@@ -1,4 +1,10 @@
-import type { ListingDto, ListingPhotoDto, UserDto } from '@staynest/shared';
+import type {
+  ListingDto,
+  ListingPhotoDto,
+  PublicListing,
+  PublicListingSummary,
+  UserDto,
+} from '@staynest/shared';
 import { vi } from 'vitest';
 
 export const demoUser: UserDto = {
@@ -80,9 +86,49 @@ export const completeListing: ListingDto = {
 };
 
 const demoAmenities = [
-  { id: 1, code: 'wifi', nameRu: 'Wi-Fi', nameEn: 'Wi-Fi', icon: 'wifi', sortOrder: 1 },
-  { id: 2, code: 'sauna', nameRu: 'Сауна', nameEn: 'Sauna', icon: 'flame', sortOrder: 2 },
+  { id: 1, code: 'wifi', nameRu: 'Wi-Fi', nameEn: 'Wi-Fi', icon: 'wifi', sortOrder: 10 },
+  { id: 2, code: 'sauna', nameRu: 'Сауна', nameEn: 'Sauna', icon: 'flame', sortOrder: 20 },
 ];
+
+export const demoPublicListing: PublicListingSummary = {
+  id: 'b2f7e8d1-4f1a-4c6e-9a0b-1c2d3e4f5a6b',
+  type: 'house',
+  title: 'Дом у озера',
+  country: 'RU',
+  region: 'Владимирская область',
+  city: 'Суздаль',
+  approxLat: 56.42,
+  approxLng: 40.45,
+  maxGuests: 4,
+  bedrooms: 2,
+  beds: 3,
+  bathrooms: 1,
+  areaSqm: 86,
+  basePriceMinor: 750_000,
+  weekendPriceMinor: 850_000,
+  cleaningFeeMinor: 150_000,
+  currency: 'RUB',
+  minNights: 2,
+  maxNights: 14,
+  coverPhoto: demoPhoto,
+  photoCount: 3,
+  publishedAt: '2026-10-01T10:00:00.000Z',
+};
+
+export const demoPublicDetail: PublicListing = {
+  ...demoPublicListing,
+  description:
+    'Тихий дом с террасой и видом на озеро. Внутри камин, просторная кухня и три спальных места. Подходит для семьи из четырёх человек.',
+  checkInTime: '15:00',
+  checkOutTime: '11:00',
+  houseRules: 'Курить нельзя. С животными — по договорённости.',
+  photos: [
+    demoPhoto,
+    { ...demoPhoto, id: '6c8d7f7e-2b3c-5d4e-9f0a-1b2c3d4e5f60', position: 1, isCover: false },
+    { ...demoPhoto, id: '7d9e8a8f-3c4d-6e5f-0a1b-2c3d4e5f6071', position: 2, isCover: false },
+  ],
+  amenities: demoAmenities,
+};
 
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -97,6 +143,8 @@ export type ApiMockOptions = {
   loginBody?: unknown;
   registerBody?: unknown;
   listings?: ListingDto[];
+  catalogListings?: PublicListingSummary[];
+  catalogDetail?: PublicListing | null;
   publishStatus?: number;
   publishBody?: unknown;
   onRequest?: (url: string, init?: RequestInit) => void;
@@ -149,9 +197,21 @@ function currentListing(store: ListingDto[], url: string): ListingDto {
   return store.find((listing) => listing.id === listingId(url)) ?? demoListing;
 }
 
-function listingGetRoute({ url }: RouteContext): Response | null {
+function listingGetRoute({ url, method, options }: RouteContext): Response | null {
+  if (method !== 'GET') return null;
   if (url.endsWith('/me/listings')) return null;
+  if (url.includes('/cities')) return jsonResponse({ cities: ['Суздаль', 'Кострома'] });
   if (url.endsWith('/amenities')) return jsonResponse({ amenities: demoAmenities });
+  if (url.includes('/listings?')) {
+    return jsonResponse({
+      listings: options.catalogListings ?? [demoPublicListing],
+      nextCursor: null,
+    });
+  }
+  if (/\/listings\/[^/?]+$/.test(url)) {
+    if (options.catalogDetail === null) return jsonResponse({ code: 'listing_not_found' }, 404);
+    return jsonResponse({ listing: options.catalogDetail ?? demoPublicDetail });
+  }
   return null;
 }
 

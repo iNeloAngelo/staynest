@@ -32,6 +32,10 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
       restoreMocks: true,
+      // Мастер объявления в jsdom занимает ~4 с; при параллельном прогоне
+      // дефолтные 5 с дают флап. Это верхняя граница, а не цель.
+      testTimeout: 15_000,
+      hookTimeout: 15_000,
     },
   };
 });
