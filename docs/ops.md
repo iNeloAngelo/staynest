@@ -18,9 +18,12 @@
 - Перед удалением сделан проверенный бэкап: `/root/backups/server-20261017-100153.tar.gz` (143 МБ, sha256 `53658291…385a59`), локальная копия — `C:\Users\User\staynest-backup\`. Архив содержит секреты, в git не попадает.
 - UFW: только 22/80/443, входящие по умолчанию запрещены. SSH: только ключи, `PasswordAuthentication no`, `PermitRootLogin prohibit-password`.
 - `fail2ban` активен (jail sshd), время сервера — UTC, `unattended-upgrades` включён.
-- Root-доступ по ключу оставлен до деплоя. Пользователь `deploy`, домен и TLS создаются в Сессии 17.
 - 2026-10-19: добавлен swap-файл `/swapfile` 2 ГБ (прописан в `/etc/fstab`).
-- 2026-10-19: поднят staging-Postgres 16 в `/opt/staynest` (`infra/docker-compose.prod.yml`), порт только `127.0.0.1:5433`. Базы `staynest` и `staynest_test`, секреты в `/opt/staynest/.env` (600). С машины разработчика доступ через SSH-туннель (ADR-027), локальный Docker не используется.
+- 2026-10-19: создан пользователь `deploy` (sudo + docker, вход по тому же SSH-ключу). Root-доступ по ключу пока оставлен и закрывается в Сессии 17.
+- 2026-10-19: репозиторий склонирован в `/opt/staynest`; доступ к GitHub — read-only deploy key `~deploy/.ssh/github_deploy`, `git pull` работает.
+- 2026-10-19: поднят контур `caddy + api + postgres + silo + mailpit` (`infra/docker-compose.prod.yml`, проект `staynest`). Сайт: `https://olivertwist95.clodocd.com`, TLS Let's Encrypt, наружу только 80/443. Фактическое потребление памяти ~275 МБ.
+- Postgres слушает только `127.0.0.1:5433`; базы `staynest` и `staynest_test`. С машины разработчика доступ через SSH-туннель (ADR-027), локальный Docker не используется. Секреты в `/opt/staynest/.env` (600, владелец `deploy`).
+- Деплой одной командой: `scripts/deploy.sh` (git pull, сборка, миграции, перезапуск).
 
 ## 2. Целевая конфигурация
 

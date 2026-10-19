@@ -29,6 +29,13 @@
 - **Windows и `spawn`.** `spawnSync('pnpm', ..., { shell: true })` даёт DeprecationWarning и риск инъекции; правильнее `pnpm.cmd` без shell.
 - **Тестовая база одна на все файлы.** Между тестами нужен `TRUNCATE ... RESTART IDENTITY CASCADE`, а файлы запускаются последовательно (ADR-029).
 
+### 2026-10-19 / деплой стенда
+- **Первый push в новый репозиторий ломает gitleaks-action.** Push event передаёт `before`, которого нет в истории; action строит диапазон `before^..HEAD` и падает с «unknown revision». Следующие push проходят. Не считать это утечкой; при повторении — `fetch-depth: 0` уже стоит, лечится перезапуском job.
+- **Проверка портов с машины разработчика врёт.** Локальный VPN/прокси принимает TCP-соединения на любой порт, поэтому `Test-NetConnection` показывает «open» даже для 12345. Проверять через `ss -tulpn` на сервере и `/dev/tcp` с самого сервера, а не с ноутбука.
+- **Docker-сборка на 1 vCPU реальна.** Два образа (api + web) собрались примерно за 2 минуты с cache-mount для pnpm store; без swap и кэша было бы заметно дольше. Кэш `/root/.local/share/pnpm/store` переживает пересборки.
+- **Git в чужом каталоге.** Root не может читать репозиторий, принадлежащий `deploy`: Git ругается «dubious ownership». Все git-операции выполнять через `sudo -u deploy -H`, а не добавлять `safe.directory` root-у.
+- **Deploy key вместо токена.** Приватный репозиторий на сервере читается read-only deploy key; push с сервера невозможен, токен с правом записи там не нужен.
+
 ### 2026-10-19 / Сессия 1 / фундамент
 - **MinIO больше не раздаёт образы.** `minio/minio` удалён с Docker Hub, `quay.io/minio/minio` отдаёт 401. В dev и prod используем совместимый форк `pgsty/silo`, закреплённый по digest. Код работает через S3-клиент, поэтому замена образа не влияет на приложение. См. ADR-021.
 - **pnpm 12 игнорирует `pnpm.onlyBuiltDependencies`.** Настройки переехали в `pnpm-workspace.yaml`, ключ `allowBuilds` — это mapping (`esbuild: true`), а не список. Иначе установка падает с `ERR_PNPM_IGNORED_BUILDS`. См. ADR-023.
