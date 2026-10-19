@@ -61,6 +61,24 @@ export const demoPhoto: ListingPhotoDto = {
   },
 };
 
+export const completeListing: ListingDto = {
+  ...demoListing,
+  title: 'Дом у озера',
+  description: 'Тихий дом у озера с террасой, камином и видом на сосновый лес.',
+  city: 'Суздаль',
+  region: 'Владимирская область',
+  addressLine: 'улица Лесная, 12',
+  maxGuests: 4,
+  bedrooms: 2,
+  beds: 3,
+  basePriceMinor: 750_000,
+  photos: [
+    demoPhoto,
+    { ...demoPhoto, id: '6c8d7f7e-2b3c-5d4e-9f0a-1b2c3d4e5f60', position: 1, isCover: false },
+    { ...demoPhoto, id: '7d9e8a8f-3c4d-6e5f-0a1b-2c3d4e5f6071', position: 2, isCover: false },
+  ],
+};
+
 const demoAmenities = [
   { id: 1, code: 'wifi', nameRu: 'Wi-Fi', nameEn: 'Wi-Fi', icon: 'wifi', sortOrder: 1 },
   { id: 2, code: 'sauna', nameRu: 'Сауна', nameEn: 'Sauna', icon: 'flame', sortOrder: 2 },

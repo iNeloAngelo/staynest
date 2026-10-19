@@ -35,13 +35,14 @@ function useInvalidateMine() {
     });
 }
 
-export function useMyListings() {
+export function useMyListings(options: { refetchOnMount?: boolean | 'always' } = {}) {
   const { data: user } = useMe();
 
   return useQuery<ListingDto[]>({
     queryKey: [...listingKeys.mine, user?.id ?? 'anonymous'],
     queryFn: fetchMyListings,
     staleTime: LISTINGS_STALE_TIME_MS,
+    refetchOnMount: options.refetchOnMount,
     enabled: Boolean(user),
   });
 }

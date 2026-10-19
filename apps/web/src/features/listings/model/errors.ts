@@ -62,17 +62,30 @@ export function publishIssuesFrom(error: unknown): ListingPublishIssue[] {
 
 const ANCHORED_FIELDS = new Set([
   'title',
+  'type',
   'description',
   'city',
+  'region',
   'addressLine',
   'maxGuests',
   'bedrooms',
   'beds',
+  'bathrooms',
+  'areaSqm',
   'basePrice',
+  'weekendPrice',
+  'cleaningFee',
+  'minNights',
+  'maxNights',
+  'checkInTime',
+  'checkOutTime',
+  'houseRules',
 ]);
 
 const FIELD_ALIASES: Record<string, string> = {
   basePriceMinor: 'basePrice',
+  weekendPriceMinor: 'weekendPrice',
+  cleaningFeeMinor: 'cleaningFee',
 };
 
 export function fieldAnchor(field: string): string | null {

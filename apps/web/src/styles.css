@@ -131,6 +131,11 @@
   padding-bottom: calc(56px + env(safe-area-inset-bottom));
 }
 
+/* Липкая панель мастера должна оставаться над нижней навигацией. */
+@utility bottom-nav {
+  bottom: calc(56px + env(safe-area-inset-bottom));
+}
+
 @utility z-toast {
   z-index: 60;
 }

@@ -103,7 +103,8 @@ function isInvalid(raw: string, parsed: number | null): boolean {
   return raw.trim() !== '' && parsed === null;
 }
 
-function numericIssues(state: ListingFormState): ListingFormIssue[] {
+/** Проверки формата полей. Полнота для публикации проверяется по шагам мастера. */
+export function numericIssues(state: ListingFormState): ListingFormIssue[] {
   const checks: Array<[keyof ListingFormState, string, boolean]> = [
     [
       'maxGuests',
@@ -183,4 +184,9 @@ export function toUpdateInput(state: ListingFormState): {
   };
 
   return { input, issues: numericIssues(state) };
+}
+
+/** Подпись состояния формы: по ней мастер понимает, есть ли несохранённые правки. */
+export function stateSignature(state: ListingFormState): string {
+  return JSON.stringify(state);
 }

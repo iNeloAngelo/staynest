@@ -1,7 +1,8 @@
 import { House } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ListingEditor, useMyListings } from '../../features/listings';
+import { ListingWizard } from '../../features/listing-editor';
+import { useMyListings } from '../../features/listings';
 import { Button, EmptyState, Skeleton } from '../../shared/ui';
 
 function EditorSkeleton() {
@@ -18,7 +19,7 @@ export function ListingEditorPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { id = '' } = useParams();
-  const { data, isPending, isError, refetch } = useMyListings();
+  const { data, isPending, isError, refetch } = useMyListings({ refetchOnMount: 'always' });
 
   if (isPending) return <EditorSkeleton />;
 
@@ -54,5 +55,5 @@ export function ListingEditorPage() {
     );
   }
 
-  return <ListingEditor listing={listing} />;
+  return <ListingWizard key={listing.id} listing={listing} />;
 }

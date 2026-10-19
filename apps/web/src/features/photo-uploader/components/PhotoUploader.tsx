@@ -15,6 +15,8 @@ import { UploadQueue } from './UploadQueue';
 type PhotoUploaderProps = {
   listingId: string;
   photos: ListingPhotoDto[];
+  /** Внешняя блокировка, например неразрешённый конфликт версий. */
+  disabled?: boolean;
 };
 
 function OfflineNote({ online }: { online: boolean }) {
@@ -28,7 +30,8 @@ function OfflineNote({ online }: { online: boolean }) {
   );
 }
 
-export function PhotoUploader({ listingId, photos }: PhotoUploaderProps) {
+export function PhotoUploader(props: PhotoUploaderProps) {
+  const { listingId, photos, disabled: externalDisabled = false } = props;
   const { t } = useTranslation();
   const online = useOnline();
   const toast = useToast();
@@ -36,7 +39,7 @@ export function PhotoUploader({ listingId, photos }: PhotoUploaderProps) {
   const actions = usePhotoActions(listingId);
   const [confirm, setConfirm] = useState<ListingPhotoDto | null>(null);
   const uploading = uploads.items.some((item) => item.status === 'uploading');
-  const disabled = !online || actions.remove.isPending || uploading;
+  const disabled = externalDisabled || !online || actions.remove.isPending || uploading;
 
   function remove(): void {
     const photo = confirm;

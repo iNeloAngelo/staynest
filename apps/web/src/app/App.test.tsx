@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ModeProvider } from '../features/mode-switch';
 import { ToastProvider } from '../shared/ui';
-import { demoListing, demoUser, mockApi } from '../test/api-mocks';
+import { completeListing, demoListing, demoUser, mockApi } from '../test/api-mocks';
 import { App } from './App';
 
 function renderApp(initialEntries: string[]) {
@@ -28,6 +28,7 @@ function renderApp(initialEntries: string[]) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  window.localStorage.clear();
 });
 
 describe('App', () => {
@@ -235,7 +236,7 @@ describe('App', () => {
   it('показывает ошибки публикации из ответа сервера', async () => {
     mockApi({
       user: demoUser,
-      listings: [{ ...demoListing, title: 'Дом у озера' }],
+      listings: [completeListing],
       publishStatus: 422,
       publishBody: {
         code: 'listing_incomplete',
@@ -246,10 +247,10 @@ describe('App', () => {
       },
     });
     const user = userEvent.setup();
-    renderApp([`/host/listings/${demoListing.id}`]);
+    renderApp([`/host/listings/${completeListing.id}`]);
 
-    await screen.findByLabelText('Название');
-    await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
+    const publish = await screen.findByRole('button', { name: 'Опубликовать' });
+    await user.click(publish);
 
     expect(await screen.findByText('Пока нельзя опубликовать')).toBeInTheDocument();
     expect(screen.getByText('Добавьте минимум 3 фотографии.')).toBeInTheDocument();
@@ -280,11 +281,11 @@ describe('App', () => {
 
   it('блокирует сохранение без сети и показывает объяснение', async () => {
     vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
-    mockApi({ user: demoUser, listings: [{ ...demoListing, title: 'Дом у озера' }] });
-    renderApp([`/host/listings/${demoListing.id}`]);
+    mockApi({ user: demoUser, listings: [completeListing] });
+    renderApp([`/host/listings/${completeListing.id}`]);
 
     expect((await screen.findAllByText(/Нет сети/)).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Сохранить' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Опубликовать' })).toBeDisabled();
   });
 });

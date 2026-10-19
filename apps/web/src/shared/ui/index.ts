@@ -12,6 +12,7 @@ export * from './ModeSwitch';
 export * from './NumberStepper';
 export * from './Select';
 export * from './Skeleton';
+export * from './Stepper';
 export { textLink } from './styles';
 export * from './Textarea';
 export * from './Toast';
