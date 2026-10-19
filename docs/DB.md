@@ -346,6 +346,16 @@ ALTER TABLE listings
   FOREIGN KEY (cover_photo_id) REFERENCES listing_photos(id) ON DELETE SET NULL;
 ```
 
+**Хранение вариантов.** `storage_prefix` — это `listings/{listing_id}/{photo_id}`,
+объекты в бакете: `{storage_prefix}/thumb.webp` (400 px), `md.webp` (1000 px),
+`lg.webp` (2000 px). Публичная политика бакета разрешает анонимный `GetObject`
+только на `listings/*/*/*.webp`; API создаёт бакет и политику при первом
+обращении. Раздача идёт через `/media/listings/{storage_prefix}/lg.webp`
+(Caddy → Silo), только `GET`/`HEAD`, поэтому в БД и ответах не хранится
+абсолютный URL и домен. При удалении фото или черновика объекты удаляются из
+хранилища; если удаление объекта не удалось, строка БД уже удалена, а
+объект-сирота чистится отдельно (Backlog).
+
 ## 8. listing_price_rules — сезонные цены
 
 Период включительный: ночи от `date_from` до `date_to`.
