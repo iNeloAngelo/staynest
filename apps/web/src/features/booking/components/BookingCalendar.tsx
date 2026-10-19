@@ -1,5 +1,4 @@
 import type { CalendarResponse } from '@staynest/shared';
-import { addDays } from '@staynest/shared';
 import { DayPicker } from 'react-day-picker';
 import type { DateRange } from 'react-day-picker';
 import { enUS, ru as ruLocale } from 'react-day-picker/locale';
@@ -43,7 +42,7 @@ export function BookingCalendar({
 
   function dayLabel(date: Date, modifiers: Record<string, boolean>): string {
     const iso = formatIsoDateLocal(date);
-    const afterWindow = iso > addDays(calendar.to, -1);
+    const afterWindow = iso > calendar.to;
     const status = modifiers.booked
       ? t('booking.dayBooked')
       : modifiers.blocked
@@ -77,11 +76,11 @@ export function BookingCalendar({
       modifiers={{ booked, blocked }}
       modifiersClassNames={calendarModifiersClassNames}
       startMonth={parseIsoDateLocal(calendar.today)}
-      endMonth={parseIsoDateLocal(addDays(calendar.to, -1))}
+      endMonth={parseIsoDateLocal(calendar.to)}
       today={parseIsoDateLocal(calendar.today)}
       disabled={[
         { before: parseIsoDateLocal(calendar.today) },
-        { after: parseIsoDateLocal(addDays(calendar.to, -1)) },
+        { after: parseIsoDateLocal(calendar.to) },
       ]}
       labels={{ labelDayButton: dayLabel }}
     />

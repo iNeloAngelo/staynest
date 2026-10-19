@@ -1,5 +1,4 @@
 import type { HostCalendarResponse } from '@staynest/shared';
-import { addDays } from '@staynest/shared';
 import { DayPicker } from 'react-day-picker';
 import type { DateRange, ModifiersClassNames } from 'react-day-picker';
 import { enUS, ru as ruLocale } from 'react-day-picker/locale';
@@ -35,7 +34,7 @@ export function HostMonthCalendar({
 
   function dayLabel(date: Date, flags: Record<string, boolean>): string {
     const iso = formatIsoDateLocal(date);
-    const afterWindow = iso > addDays(calendar.to, -1);
+    const afterWindow = iso > calendar.to;
     const status = flags.pending
       ? t('hostCalendar.legend.pending')
       : flags.confirmed
@@ -72,9 +71,9 @@ export function HostMonthCalendar({
       today={parseIsoDateLocal(calendar.today)}
       disabled={[
         { before: parseIsoDateLocal(calendar.today) },
-        { after: parseIsoDateLocal(addDays(calendar.to, -1)) },
+        { after: parseIsoDateLocal(calendar.to) },
       ]}
-      endMonth={parseIsoDateLocal(addDays(calendar.to, -1))}
+      endMonth={parseIsoDateLocal(calendar.to)}
       labels={{ labelDayButton: dayLabel }}
     />
   );
