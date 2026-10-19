@@ -144,13 +144,13 @@ export interface ListingPriceRules {
 export interface Listings {
   address_line: string | null;
   area_sqm: number | null;
-  base_price_minor: Int8;
+  base_price_minor: Int8 | null;
   bathrooms: Generated<number>;
-  bedrooms: number;
-  beds: number;
+  bedrooms: number | null;
+  beds: number | null;
   check_in_time: Generated<string>;
   check_out_time: Generated<string>;
-  city: string;
+  city: string | null;
   cleaning_fee_minor: Generated<Int8>;
   country: Generated<string>;
   cover_photo_id: string | null;
@@ -161,7 +161,7 @@ export interface Listings {
   id: Generated<string>;
   lat: Numeric | null;
   lng: Numeric | null;
-  max_guests: number;
+  max_guests: number | null;
   max_nights: Generated<number>;
   min_nights: Generated<number>;
   owner_id: string;
@@ -171,7 +171,7 @@ export interface Listings {
   region: string | null;
   search_tsv: Generated<string | null>;
   status: Generated<ListingStatus>;
-  title: string;
+  title: string | null;
   type: Generated<ListingType>;
   updated_at: Generated<Timestamp>;
   weekend_price_minor: Int8 | null;

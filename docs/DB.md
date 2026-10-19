@@ -16,6 +16,7 @@ PostgreSQL 16. Источник правды: SQL-миграции в `db/migrat
 | `0004_listings` | `listings`, `listing_amenities`, `listing_photos`, внешний ключ обложки |
 | `0005_bookings_and_audit` | `bookings` с EXCLUDE, `booking_events`, `idempotency_keys` |
 | `0006_availability_and_misc` | блокировки и цены, Telegram, избранное, уведомления, push, платежи, отзывы |
+| `0007_listing_drafts` | незаполненные черновики объявлений: nullable-поля и CHECK полноты для `published`/`archived` |
 
 ```bash
 pnpm db:reset        # пересоздать базу разработки: drop schema, миграции, сид
@@ -206,19 +207,19 @@ CREATE TABLE amenities (
 | owner_id | uuid | FK users(id), NOT NULL |
 | status | listing_status | NOT NULL, default 'draft' |
 | type | listing_type | NOT NULL, default 'house' |
-| title | text | NOT NULL, 5–120 символов |
+| title | text | NULL только у черновика, для `published`/`archived` 5–120 символов |
 | description | text | NOT NULL, default '' |
 | country | text | NOT NULL, default 'RU' (ISO код) |
 | region | text | NULL |
-| city | text | NOT NULL |
+| city | text | NULL только у черновика |
 | address_line | text | NULL (в публичной выдаче скрывается до подтверждения брони) |
 | lat, lng | numeric(9,6) | NULL, CHECK диапазонов |
-| max_guests | smallint | NOT NULL, 1–30 |
-| bedrooms | smallint | NOT NULL, 0–20 |
-| beds | smallint | NOT NULL, 1–40 |
+| max_guests | smallint | NULL только у черновика, 1–30 |
+| bedrooms | smallint | NULL только у черновика, 0–20 |
+| beds | smallint | NULL только у черновика, 1–40 |
 | bathrooms | smallint | NOT NULL, default 1 |
 | area_sqm | smallint | NULL |
-| base_price_minor | bigint | NOT NULL, CHECK > 0, цена за ночь |
+| base_price_minor | bigint | NULL только у черновика, CHECK > 0, цена за ночь |
 | weekend_price_minor | bigint | NULL, CHECK > 0 |
 | cleaning_fee_minor | bigint | NOT NULL, default 0, CHECK >= 0 |
 | currency | char(3) | NOT NULL, default 'RUB' |
@@ -240,20 +241,20 @@ CREATE TABLE listings (
   owner_id            uuid NOT NULL REFERENCES users(id),
   status              listing_status NOT NULL DEFAULT 'draft',
   type                listing_type NOT NULL DEFAULT 'house',
-  title               text NOT NULL CHECK (char_length(title) BETWEEN 5 AND 120),
+  title               text CHECK (title IS NULL OR char_length(title) BETWEEN 5 AND 120),
   description         text NOT NULL DEFAULT '',
   country             text NOT NULL DEFAULT 'RU',
   region              text,
-  city                text NOT NULL,
+  city                text,
   address_line        text,
   lat                 numeric(9,6) CHECK (lat BETWEEN -90 AND 90),
   lng                 numeric(9,6) CHECK (lng BETWEEN -180 AND 180),
-  max_guests          smallint NOT NULL CHECK (max_guests BETWEEN 1 AND 30),
-  bedrooms            smallint NOT NULL CHECK (bedrooms BETWEEN 0 AND 20),
-  beds                smallint NOT NULL CHECK (beds BETWEEN 1 AND 40),
+  max_guests          smallint CHECK (max_guests BETWEEN 1 AND 30),
+  bedrooms            smallint CHECK (bedrooms BETWEEN 0 AND 20),
+  beds                smallint CHECK (beds BETWEEN 1 AND 40),
   bathrooms           smallint NOT NULL DEFAULT 1 CHECK (bathrooms BETWEEN 0 AND 20),
   area_sqm            smallint CHECK (area_sqm > 0),
-  base_price_minor    bigint NOT NULL CHECK (base_price_minor > 0),
+  base_price_minor    bigint CHECK (base_price_minor > 0),
   weekend_price_minor bigint CHECK (weekend_price_minor > 0),
   cleaning_fee_minor  bigint NOT NULL DEFAULT 0 CHECK (cleaning_fee_minor >= 0),
   currency            char(3) NOT NULL DEFAULT 'RUB',
@@ -271,7 +272,21 @@ CREATE TABLE listings (
   published_at        timestamptz,
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now(),
-  CHECK (max_nights >= min_nights)
+  CHECK (max_nights >= min_nights),
+  -- Черновик может быть недозаполнен, но всё опубликованное и архивное — полное.
+  CONSTRAINT listings_complete_when_not_draft CHECK (
+    status = 'draft' OR (
+      title IS NOT NULL
+      AND char_length(title) BETWEEN 5 AND 120
+      AND char_length(description) >= 50
+      AND city IS NOT NULL AND char_length(btrim(city)) > 0
+      AND address_line IS NOT NULL AND char_length(btrim(address_line)) > 0
+      AND max_guests IS NOT NULL
+      AND bedrooms IS NOT NULL
+      AND beds IS NOT NULL
+      AND base_price_minor IS NOT NULL
+    )
+  )
 );
 CREATE TRIGGER listings_set_updated_at BEFORE UPDATE ON listings
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
