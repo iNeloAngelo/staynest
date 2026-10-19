@@ -162,7 +162,7 @@ function ListingEditorForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       <ListingBasicsSection {...sectionProps} />
       <ListingLocationSection {...sectionProps} />
       <ListingCapacitySection {...sectionProps} />

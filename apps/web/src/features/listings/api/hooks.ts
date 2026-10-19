@@ -5,6 +5,7 @@ import type {
   UpdateListingInput,
 } from '@staynest/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMe } from '../../auth';
 import {
   archiveListing,
   createListing,
@@ -35,10 +36,13 @@ function useInvalidateMine() {
 }
 
 export function useMyListings() {
+  const { data: user } = useMe();
+
   return useQuery<ListingDto[]>({
-    queryKey: listingKeys.mine,
+    queryKey: [...listingKeys.mine, user?.id ?? 'anonymous'],
     queryFn: fetchMyListings,
     staleTime: LISTINGS_STALE_TIME_MS,
+    enabled: Boolean(user),
   });
 }
 

@@ -254,4 +254,37 @@ describe('App', () => {
     expect(await screen.findByText('Пока нельзя опубликовать')).toBeInTheDocument();
     expect(screen.getByText('Добавьте минимум 3 фотографии.')).toBeInTheDocument();
   });
+
+  it('сохраняет форму и отправляет PATCH с введёнными полями', async () => {
+    let body: Record<string, unknown> | null = null;
+    mockApi({
+      user: demoUser,
+      listings: [{ ...demoListing, title: 'Дом у озера' }],
+      onRequest: (url, init) => {
+        if (init?.method === 'PATCH' && url.includes('/listings/') && init.body) {
+          body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        }
+      },
+    });
+    const user = userEvent.setup();
+    renderApp([`/host/listings/${demoListing.id}`]);
+
+    const title = await screen.findByLabelText('Название');
+    await user.clear(title);
+    await user.type(title, 'Дом у озера 2');
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    expect(await screen.findByText('Изменения сохранены')).toBeInTheDocument();
+    expect(body).toMatchObject({ title: 'Дом у озера 2' });
+  });
+
+  it('блокирует сохранение без сети и показывает объяснение', async () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    mockApi({ user: demoUser, listings: [{ ...demoListing, title: 'Дом у озера' }] });
+    renderApp([`/host/listings/${demoListing.id}`]);
+
+    expect(await screen.findByText(/Нет сети/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Опубликовать' })).toBeDisabled();
+  });
 });

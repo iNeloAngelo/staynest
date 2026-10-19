@@ -1,4 +1,5 @@
 import type { ListingType } from '@staynest/shared';
+import { MAX_DESCRIPTION, MAX_LISTING_TITLE } from '@staynest/shared';
 import { useTranslation } from 'react-i18next';
 import { Input, Select, Textarea } from '../../../shared/ui';
 import type { TranslationKey } from '../../../shared/i18n';
@@ -24,7 +25,7 @@ export function ListingBasicsSection({ state, setField, errors }: SectionProps) 
         hint={t('listings.field.titleHint')}
         error={errors.title}
         value={state.title}
-        maxLength={120}
+        maxLength={MAX_LISTING_TITLE}
         onChange={(event) => setField('title', event.target.value)}
       />
 
@@ -41,7 +42,7 @@ export function ListingBasicsSection({ state, setField, errors }: SectionProps) 
         hint={t('listings.field.descriptionHint')}
         error={errors.description}
         value={state.description}
-        maxLength={5000}
+        maxLength={MAX_DESCRIPTION}
         showCounter
         currentLength={state.description.length}
         onChange={(event) => setField('description', event.target.value)}

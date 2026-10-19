@@ -1,6 +1,6 @@
 import type { ListingDto } from '@staynest/shared';
 import type { TFunction } from 'i18next';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/ui';
 import {
@@ -16,10 +16,14 @@ import type { ListingFormErrors, ListingFormIssue, ListingFormState } from './fo
 
 export function useListingForm(listing: ListingDto) {
   const [state, setState] = useState<ListingFormState>(() => fromListing(listing));
+  const listingRef = useRef(listing);
+  listingRef.current = listing;
 
   useEffect(() => {
-    setState(fromListing(listing));
-  }, [listing]);
+    // Сбрасываем форму только при открытии другого объявления, а не на каждый
+    // refetch: иначе фоновое обновление затрёт несохранённый ввод.
+    setState(fromListing(listingRef.current));
+  }, [listing.id]);
 
   function setField<K extends keyof ListingFormState>(field: K, value: ListingFormState[K]): void {
     setState((current) => ({ ...current, [field]: value }));
@@ -33,6 +37,24 @@ function errorMap(issues: ListingFormIssue[], t: TFunction): ListingFormErrors {
 
   for (const item of issues) {
     errors[item.field] = t(issueTextKey(item.code));
+  }
+
+  return errors;
+}
+
+const SERVER_FORM_FIELDS: Record<string, keyof ListingFormState> = {
+  basePriceMinor: 'basePrice',
+};
+
+function serverErrorMap(
+  issues: ReturnType<typeof publishIssuesFrom>,
+  t: TFunction,
+): ListingFormErrors {
+  const errors: ListingFormErrors = {};
+
+  for (const item of issues) {
+    const field = SERVER_FORM_FIELDS[item.field] ?? item.field;
+    if (field !== 'photos') errors[field as keyof ListingFormState] = t(issueTextKey(item.code));
   }
 
   return errors;
@@ -60,13 +82,21 @@ function usePersistence(listing: ListingDto, form: ListingFormState) {
       await amenities.mutateAsync({ amenityIds: form.amenityIds });
       return true;
     } catch (error) {
+      const serverIssues = publishIssuesFrom(error);
+      if (serverIssues.length > 0) {
+        setFormErrors(serverErrorMap(serverIssues, t));
+        return false;
+      }
+
       toast.show({ title: t(listingsErrorKey(error)), tone: 'error' });
       return false;
     }
   }
 
-  async function save(): Promise<void> {
-    if (await persist()) toast.show({ title: t('listings.editor.saved'), tone: 'success' });
+  async function save(): Promise<boolean> {
+    const saved = await persist();
+    if (saved) toast.show({ title: t('listings.editor.saved'), tone: 'success' });
+    return saved;
   }
 
   return {
@@ -136,6 +166,7 @@ function useStatusActions(
     publishNow,
     archiveNow,
     removeNow,
+    clearIssues: () => setPublishIssues([]),
   };
 }
 
@@ -147,5 +178,13 @@ export function useListingActions(
   const persistence = usePersistence(listing, form);
   const status = useStatusActions(listing, persistence.persist, onDeleted);
 
-  return { ...persistence, ...status };
+  return {
+    ...persistence,
+    ...status,
+    async save(): Promise<boolean> {
+      const saved = await persistence.save();
+      if (saved) status.clearIssues();
+      return saved;
+    },
+  };
 }

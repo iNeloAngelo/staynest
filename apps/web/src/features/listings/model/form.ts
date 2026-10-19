@@ -1,4 +1,10 @@
 import type { ListingDto, ListingType, UpdateListingInput } from '@staynest/shared';
+import {
+  MAX_LISTING_TITLE,
+  MAX_MONEY_MINOR,
+  MIN_LISTING_TITLE,
+  textLength,
+} from '@staynest/shared';
 import { inputToInteger, inputToMinor, minorToInput } from '../../../shared/lib/format';
 
 export type ListingFormState = {
@@ -81,7 +87,7 @@ function boundedInteger(raw: string, min: number, max: number, fallback: number)
 
 function money(raw: string): number | null {
   const value = inputToMinor(raw);
-  return value !== null && value > 0 ? value : null;
+  return value !== null && value > 0 && value <= MAX_MONEY_MINOR ? value : null;
 }
 
 function issue(field: keyof ListingFormState, code: string): ListingFormIssue {
@@ -137,7 +143,10 @@ function numericIssues(state: ListingFormState): ListingFormIssue[] {
   }
 
   const title = state.title.trim();
-  if (title !== '' && title.length < 5) issues.push(issue('title', 'title_too_short'));
+  if (title !== '' && textLength(title) < MIN_LISTING_TITLE) {
+    issues.push(issue('title', 'title_too_short'));
+  }
+  if (textLength(title) > MAX_LISTING_TITLE) issues.push(issue('title', 'title_too_long'));
 
   return issues;
 }

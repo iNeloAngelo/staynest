@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { formatMoney } from '../../../shared/lib/format';
+import { formatMoney, inputToMinor } from '../../../shared/lib/format';
 import { useLocale } from '../../../shared/i18n';
 import { Chip, Skeleton, Textarea } from '../../../shared/ui';
 import { useAmenities } from '../api/hooks';
@@ -9,7 +9,7 @@ import { FormSection, NumberField } from './form-parts';
 export function ListingPriceSection({ state, setField, errors }: SectionProps) {
   const { t } = useTranslation();
   const { locale } = useLocale();
-  const preview = state.basePrice ? Number(state.basePrice) * 100 : null;
+  const preview = state.basePrice ? inputToMinor(state.basePrice) : null;
 
   return (
     <FormSection title={t('listings.section.prices')}>

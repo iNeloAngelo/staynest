@@ -1,16 +1,16 @@
 import { CalendarDays, Heart, House, Inbox, Luggage, Search, UserRound } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { ModeSwitchControl, useMode } from '../../features/mode-switch';
 import { BottomNav } from '../../shared/ui/BottomNav';
 import type { BottomNavItem } from '../../shared/ui/BottomNav';
 import { AppHeader } from './AppHeader';
 
-function useNavItems(): BottomNavItem[] {
+function useNavItems(hostMode: boolean): BottomNavItem[] {
   const { t } = useTranslation();
-  const { mode } = useMode();
 
-  if (mode === 'host') {
+  if (hostMode) {
     return [
       { to: '/host/listings', label: t('nav.host.listings'), icon: House },
       { to: '/host/requests', label: t('nav.host.requests'), icon: Inbox },
@@ -29,7 +29,24 @@ function useNavItems(): BottomNavItem[] {
 
 export function AppLayout() {
   const { t } = useTranslation();
-  const items = useNavItems();
+  const location = useLocation();
+  const { mode, setMode } = useMode();
+  const hostRoute = location.pathname.startsWith('/host');
+  const syncedHost = useRef(false);
+
+  useEffect(() => {
+    if (!hostRoute) {
+      syncedHost.current = false;
+      return;
+    }
+
+    if (!syncedHost.current) {
+      syncedHost.current = true;
+      if (mode !== 'host') setMode('host');
+    }
+  }, [hostRoute, mode, setMode]);
+
+  const items = useNavItems(mode === 'host' || hostRoute);
 
   return (
     <div className="flex min-h-dvh flex-col">

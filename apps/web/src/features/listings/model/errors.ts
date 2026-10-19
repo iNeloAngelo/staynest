@@ -19,6 +19,7 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
 const ISSUE_KEYS: Record<string, TranslationKey> = {
   title_required: 'listings.issues.title_required',
   title_too_short: 'listings.issues.title_too_short',
+  title_too_long: 'listings.issues.title_too_long',
   description_too_short: 'listings.issues.description_too_short',
   city_required: 'listings.issues.city_required',
   address_required: 'listings.issues.address_required',
@@ -70,6 +71,11 @@ const ANCHORED_FIELDS = new Set([
   'basePrice',
 ]);
 
+const FIELD_ALIASES: Record<string, string> = {
+  basePriceMinor: 'basePrice',
+};
+
 export function fieldAnchor(field: string): string | null {
-  return ANCHORED_FIELDS.has(field) ? `listing-${field}` : null;
+  const normalized = FIELD_ALIASES[field] ?? field;
+  return ANCHORED_FIELDS.has(normalized) ? `listing-${normalized}` : null;
 }

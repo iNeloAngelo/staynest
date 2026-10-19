@@ -16,7 +16,6 @@ export function MyListingCard({ listing }: { listing: ListingDto }) {
     <Link
       to={`/host/listings/${listing.id}`}
       className="flex gap-3 rounded-lg border border-border bg-surface p-3 shadow-sm transition-colors duration-micro hover:border-primary sm:gap-4 sm:p-4"
-      aria-label={t('listings.card.open', { title })}
     >
       <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-2 text-ink-muted sm:size-24">
         <House className="size-8" aria-hidden="true" strokeWidth={1.5} />

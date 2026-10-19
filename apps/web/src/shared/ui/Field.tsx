@@ -14,7 +14,7 @@ type FieldShellProps = {
 export function FieldShell({ id, label, hint, error, counter, children }: FieldShellProps) {
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+  const describedBy = [error ? undefined : hintId, errorId].filter(Boolean).join(' ') || undefined;
   const invalid = Boolean(error);
 
   return (

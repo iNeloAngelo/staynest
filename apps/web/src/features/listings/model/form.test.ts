@@ -63,4 +63,18 @@ describe('listing form', () => {
       ]),
     );
   });
+
+  it('считает emoji как один символ и не пропускает короткое название', () => {
+    const state = { ...fromListing(demoListing), title: '🏠🏠🏠' };
+    const { issues } = toUpdateInput(state);
+
+    expect(issues).toContainEqual({ field: 'title', code: 'title_too_short' });
+  });
+
+  it('не пропускает цену выше потолка денежных полей', () => {
+    const state = { ...fromListing(demoListing), basePrice: '999999999999' };
+    const { issues } = toUpdateInput(state);
+
+    expect(issues).toContainEqual({ field: 'basePrice', code: 'invalid_price' });
+  });
 });

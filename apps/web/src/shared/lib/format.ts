@@ -7,12 +7,20 @@ function localeTag(locale: string): string {
 export function formatMoney(minor: number, locale: string, currency = 'RUB'): string {
   const hasFraction = minor % 100 !== 0;
 
-  return new Intl.NumberFormat(localeTag(locale), {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: hasFraction ? 2 : 0,
-    maximumFractionDigits: hasFraction ? 2 : 0,
-  }).format(minor / 100);
+  try {
+    return new Intl.NumberFormat(localeTag(locale), {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: hasFraction ? 2 : 0,
+      maximumFractionDigits: hasFraction ? 2 : 0,
+    }).format(minor / 100);
+  } catch {
+    // Битая валюта в старых данных не должна ронять весь экран.
+    return new Intl.NumberFormat(localeTag(locale), {
+      minimumFractionDigits: hasFraction ? 2 : 0,
+      maximumFractionDigits: hasFraction ? 2 : 0,
+    }).format(minor / 100);
+  }
 }
 
 export function minorToInput(minor: number | null): string {

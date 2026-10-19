@@ -1,4 +1,5 @@
 import { AlertCircle } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { fieldAnchor } from '../model/errors';
 
 export type AlertIssue = {
@@ -7,10 +8,19 @@ export type AlertIssue = {
 };
 
 export function ListingIssuesAlert({ title, issues }: { title: string; issues: AlertIssue[] }) {
+  const alertRef = useRef<HTMLDivElement>(null);
+  const signature = issues.map((item) => `${item.field}:${item.message}`).join('|');
+
+  useEffect(() => {
+    if (signature) alertRef.current?.focus();
+  }, [signature]);
+
   if (issues.length === 0) return null;
 
   return (
     <div
+      ref={alertRef}
+      tabIndex={-1}
       role="alert"
       className="flex flex-col gap-2 rounded-lg border border-danger/40 bg-danger/10 p-4"
     >
