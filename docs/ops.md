@@ -20,7 +20,7 @@
 - `fail2ban` активен (jail sshd), время сервера — UTC, `unattended-upgrades` включён.
 - Root-доступ по ключу оставлен до деплоя. Пользователь `deploy`, домен и TLS создаются в Сессии 17.
 - 2026-10-19: добавлен swap-файл `/swapfile` 2 ГБ (прописан в `/etc/fstab`).
-- 2026-10-19: поднят staging-Postgres 16 в `/opt/staynest` (`infra/docker-compose.server.yml`), порт только `127.0.0.1:5433`. Базы `staynest` и `staynest_test`, секреты в `/opt/staynest/.env` (600). С машины разработчика доступ через SSH-туннель (ADR-027), локальный Docker не используется.
+- 2026-10-19: поднят staging-Postgres 16 в `/opt/staynest` (`infra/docker-compose.prod.yml`), порт только `127.0.0.1:5433`. Базы `staynest` и `staynest_test`, секреты в `/opt/staynest/.env` (600). С машины разработчика доступ через SSH-туннель (ADR-027), локальный Docker не используется.
 
 ## 2. Целевая конфигурация
 
