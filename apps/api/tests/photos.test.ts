@@ -402,7 +402,9 @@ describeDatabase('photos API', () => {
 
   it('не принимает больше 10 файлов за запрос', async () => {
     const { h, owner, listingId, media } = await setup();
-    const files = await Promise.all(Array.from({ length: 11 }, (_, index) => photoOf(`${index}.jpg`)));
+    const files = await Promise.all(
+      Array.from({ length: 11 }, (_, index) => photoOf(`${index}.jpg`)),
+    );
 
     const response = await upload(h, owner, listingId, files);
 
