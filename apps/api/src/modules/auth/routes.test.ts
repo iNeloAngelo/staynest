@@ -200,7 +200,10 @@ async function login(h: Harness, email = 'user@example.ru', password = PASSWORD)
 }
 
 async function registerVerifyLogin(h: Harness, email = 'user@example.ru') {
-  await register(h, email);
+  const registered = await register(h, email);
+  if (registered.statusCode !== 202) {
+    throw new Error(`Регистрация не удалась: ${registered.statusCode} ${registered.body}`);
+  }
   const token = tokenFromMessage(h.mail.last('verify_email'));
   await verifyEmail(h, token);
   return login(h, email);

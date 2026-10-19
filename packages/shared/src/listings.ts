@@ -9,9 +9,20 @@ export const MIN_LISTING_TITLE = 5;
 export const MIN_PUBLISHED_DESCRIPTION = 50;
 export const MAX_DESCRIPTION = 5000;
 export const MIN_PUBLISHED_PHOTOS = 3;
+/** Потолок денежных полей: защищает bigint от переполнения и UI от абсурдных сумм. */
+export const MAX_MONEY_MINOR = 100_000_000_000;
+
+/** Длина в Unicode code points: PostgreSQL `char_length` считает так же, а JS `.length` — нет. */
+export function textLength(value: string): number {
+  return Array.from(value).length;
+}
 
 const trimmedText = (min: number, max: number, message: string) =>
-  z.string().trim().min(min, message).max(max, message);
+  z
+    .string()
+    .trim()
+    .refine((value) => textLength(value) >= min, message)
+    .refine((value) => textLength(value) <= max, message);
 
 /** Пустая строка из формы означает «поле не заполнено», в БД это NULL. */
 const nullableText = (min: number, max: number, message: string) =>
@@ -19,6 +30,8 @@ const nullableText = (min: number, max: number, message: string) =>
     (value) => (typeof value === 'string' && value.trim() === '' ? null : value),
     trimmedText(min, max, message).nullable(),
   );
+
+const moneySchema = z.number().int().min(1, 'Цена должна быть больше нуля.').max(MAX_MONEY_MINOR);
 
 const timeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Время указывается как ЧЧ:ММ.');
 
@@ -32,13 +45,16 @@ export const listingInputSchema = z
     description: z
       .string()
       .trim()
-      .max(MAX_DESCRIPTION, `Описание не длиннее ${MAX_DESCRIPTION} символов.`)
+      .refine(
+        (value) => textLength(value) <= MAX_DESCRIPTION,
+        `Описание не длиннее ${MAX_DESCRIPTION} символов.`,
+      )
       .optional(),
     type: listingTypeSchema.optional(),
     country: z
       .string()
       .trim()
-      .length(2, 'Код страны — две буквы.')
+      .regex(/^[A-Za-z]{2}$/, 'Код страны — две буквы.')
       .transform((value) => value.toUpperCase())
       .optional(),
     region: nullableText(1, 120, 'Регион не длиннее 120 символов.').optional(),
@@ -51,15 +67,10 @@ export const listingInputSchema = z
     beds: z.number().int().min(1).max(40).nullable().optional(),
     bathrooms: z.number().int().min(0).max(20).optional(),
     areaSqm: z.number().int().min(1).max(2000).nullable().optional(),
-    basePriceMinor: z.number().int().min(1, 'Цена должна быть больше нуля.').nullable().optional(),
-    weekendPriceMinor: z.number().int().min(1).nullable().optional(),
-    cleaningFeeMinor: z.number().int().min(0).optional(),
-    currency: z
-      .string()
-      .trim()
-      .length(3)
-      .transform((value) => value.toUpperCase())
-      .optional(),
+    basePriceMinor: moneySchema.nullable().optional(),
+    weekendPriceMinor: moneySchema.nullable().optional(),
+    cleaningFeeMinor: z.number().int().min(0).max(MAX_MONEY_MINOR).optional(),
+    currency: z.enum(['RUB']).optional(),
     minNights: z.number().int().min(1).max(365).optional(),
     maxNights: z.number().int().min(1).max(365).optional(),
     checkInTime: timeSchema.optional(),

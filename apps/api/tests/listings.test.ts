@@ -66,23 +66,48 @@ async function fillRequired(h: Harness, user: TestUser, id: string) {
 }
 
 async function addPhotos(h: Harness, listingId: string, count: number): Promise<void> {
+  const existing = await h.db.kysely
+    .selectFrom('listing_photos')
+    .select(({ fn }) => fn.countAll<string>().as('count'))
+    .where('listing_id', '=', listingId)
+    .executeTakeFirstOrThrow();
+  const start = Number(existing.count);
+
   await h.db.kysely
     .insertInto('listing_photos')
     .values(
       Array.from({ length: count }, (_, index) => ({
         listing_id: listingId,
-        storage_prefix: `listings/${listingId}/photo-${index}`,
+        storage_prefix: `listings/${listingId}/photo-${start + index}`,
         width: 1000,
         height: 750,
-        position: index,
+        position: start + index,
       })),
     )
     .execute();
 }
 
-async function insertActiveBooking(h: Harness, listingId: string): Promise<string> {
+async function publishFully(h: Harness, host: TestUser): Promise<string> {
+  const id = await createDraft(h, host);
+  await fillRequired(h, host, id);
+  await addPhotos(h, id, 3);
+  const response = await h.app.inject({
+    method: 'POST',
+    url: `/api/v1/listings/${id}/publish`,
+    headers: authCookie(host),
+  });
+  expect(response.statusCode).toBe(200);
+  return id;
+}
+
+async function insertBooking(
+  h: Harness,
+  listingId: string,
+  range = '[2027-01-10,2027-01-12)',
+  status: 'pending' | 'confirmed' | 'declined' = 'pending',
+): Promise<string> {
   const guest = await usersService.create(h.db.kysely, {
-    email: `guest-${Date.now()}@example.ru`,
+    email: `guest-${Date.now()}-${Math.random()}@example.ru`,
     passwordHash: await hash(TEST_PASSWORD),
     displayName: 'Гость',
     locale: 'ru',
@@ -94,12 +119,12 @@ async function insertActiveBooking(h: Harness, listingId: string): Promise<strin
     .values({
       listing_id: listingId,
       guest_id: guest.id,
-      stay_range: '[2027-01-10,2027-01-12)',
+      stay_range: range,
       guests_count: 2,
       total_minor: 1_000_000,
       currency: 'RUB',
       price_breakdown: { nights: [] },
-      status: 'pending',
+      status,
     })
     .returning('id')
     .executeTakeFirstOrThrow();
@@ -373,7 +398,7 @@ describeDatabase('listings API', () => {
       url: `/api/v1/listings/${id}/publish`,
       headers: authCookie(host),
     });
-    await insertActiveBooking(h, id);
+    await insertBooking(h, id);
 
     const response = await h.app.inject({
       method: 'POST',
@@ -383,6 +408,149 @@ describeDatabase('listings API', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({ code: 'listing_has_active_bookings' });
+  });
+
+  it('отвергает смену статуса и валюты через PATCH', async () => {
+    const { h, host } = await setup();
+    const id = await createDraft(h, host);
+
+    const status = await patchListing(h, host, id, { status: 'archived' });
+    const currency = await patchListing(h, host, id, { currency: '123' });
+    const owner = await patchListing(h, host, id, { ownerId: host.id });
+
+    expect(status.statusCode).toBe(422);
+    expect(currency.statusCode).toBe(422);
+    expect(owner.statusCode).toBe(422);
+
+    const row = await h.db.kysely
+      .selectFrom('listings')
+      .selectAll()
+      .where('id', '=', id)
+      .executeTakeFirstOrThrow();
+    expect(row.status).toBe('draft');
+    expect(row.currency.trim()).toBe('RUB');
+  });
+
+  it('считает длину названия в code points, как PostgreSQL', async () => {
+    const { h, host } = await setup();
+    const id = await createDraft(h, host);
+
+    const emoji = await patchListing(h, host, id, { title: '🏠🏠🏠' });
+    const short = await patchListing(h, host, id, { title: 'Дом' });
+    const long = await patchListing(h, host, id, { title: 'Д'.repeat(121) });
+
+    expect(emoji.statusCode).toBe(422);
+    expect(short.statusCode).toBe(422);
+    expect(long.statusCode).toBe(422);
+  });
+
+  it('не сохраняет опубликованное объявление в неполном виде', async () => {
+    const { h, host } = await setup();
+    const id = await publishFully(h, host);
+
+    const response = await patchListing(h, host, id, { description: 'Слишком коротко' });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ code: 'listing_incomplete' });
+  });
+
+  it('публикует только при трёх фото и переживает конкурентный повтор', async () => {
+    const { h, host } = await setup();
+    const id = await createDraft(h, host);
+    await fillRequired(h, host, id);
+    await addPhotos(h, id, 2);
+
+    const twoPhotos = await h.app.inject({
+      method: 'POST',
+      url: `/api/v1/listings/${id}/publish`,
+      headers: authCookie(host),
+    });
+    expect(twoPhotos.statusCode).toBe(422);
+    expect(
+      (twoPhotos.json() as { errors: Array<{ field: string }> }).errors.map((error) => error.field),
+    ).toContain('photos');
+
+    await addPhotos(h, id, 1);
+    const [first, second] = await Promise.all([
+      h.app.inject({
+        method: 'POST',
+        url: `/api/v1/listings/${id}/publish`,
+        headers: authCookie(host),
+      }),
+      h.app.inject({
+        method: 'POST',
+        url: `/api/v1/listings/${id}/publish`,
+        headers: authCookie(host),
+      }),
+    ]);
+
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+  });
+
+  it('архивирует при подтверждённой брони только после её завершения', async () => {
+    const { h, host } = await setup();
+    const id = await publishFully(h, host);
+    await insertBooking(h, id, '[2027-01-10,2027-01-12)', 'confirmed');
+
+    const blocked = await h.app.inject({
+      method: 'POST',
+      url: `/api/v1/listings/${id}/archive`,
+      headers: authCookie(host),
+    });
+    expect(blocked.statusCode).toBe(409);
+
+    await h.db.kysely
+      .updateTable('bookings')
+      .set({ status: 'completed' })
+      .where('listing_id', '=', id)
+      .execute();
+
+    const archived = await h.app.inject({
+      method: 'POST',
+      url: `/api/v1/listings/${id}/archive`,
+      headers: authCookie(host),
+    });
+    expect(archived.statusCode).toBe(200);
+  });
+
+  it('прошлая бронь не мешает архивированию', async () => {
+    const { h, host } = await setup();
+    const id = await publishFully(h, host);
+    await insertBooking(h, id, '[2020-01-10,2020-01-12)', 'pending');
+
+    const response = await h.app.inject({
+      method: 'POST',
+      url: `/api/v1/listings/${id}/archive`,
+      headers: authCookie(host),
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
+  it('удаляет строку черновика, а повторное удаление даёт 404', async () => {
+    const { h, host } = await setup();
+    const id = await createDraft(h, host);
+
+    const removed = await h.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/listings/${id}`,
+      headers: authCookie(host),
+    });
+    const repeated = await h.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/listings/${id}`,
+      headers: authCookie(host),
+    });
+
+    expect(removed.statusCode).toBe(204);
+    expect(repeated.statusCode).toBe(404);
+
+    const count = await h.db.kysely
+      .selectFrom('listings')
+      .select(({ fn }) => fn.countAll<string>().as('count'))
+      .where('id', '=', id)
+      .executeTakeFirstOrThrow();
+    expect(count.count).toBe('0');
   });
 
   it('закрывает эндпоинты без авторизации', async () => {

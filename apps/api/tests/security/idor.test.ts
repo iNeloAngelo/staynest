@@ -101,6 +101,92 @@ describeDatabase('IDOR: объявления', () => {
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({ code: 'listing_not_found' });
+
+    const row = await h.db.kysely
+      .selectFrom('listings')
+      .select(['title', 'status', 'published_at'])
+      .where('id', '=', id)
+      .executeTakeFirstOrThrow();
+    expect(row).toEqual({ title: null, status: 'draft', published_at: null });
+  });
+
+  it('неподтверждённый чужой пользователь получает 404, а не 403', async () => {
+    const { h, stranger, id } = await setupPair();
+
+    await h.db.kysely
+      .updateTable('users')
+      .set({ email_verified_at: null })
+      .where('id', '=', stranger.id)
+      .execute();
+
+    const response = await h.app.inject({
+      method: 'POST',
+      url: `/api/v1/listings/${id}/publish`,
+      headers: { cookie: stranger.cookie },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('опубликованное чужое объявление нельзя изменить или снять с публикации', async () => {
+    const { h, owner, stranger, id } = await setupPair();
+
+    await h.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/listings/${id}`,
+      headers: { cookie: owner.cookie },
+      payload: {
+        title: 'Дом у озера',
+        description:
+          'Тихий дом с террасой и видом на озеро. Подходит для семьи из четырёх человек, есть камин и лодка.',
+        city: 'Суздаль',
+        addressLine: 'Лесная улица, 12',
+        maxGuests: 4,
+        bedrooms: 2,
+        beds: 3,
+        basePriceMinor: 750_000,
+      },
+    });
+    await h.db.kysely
+      .insertInto('listing_photos')
+      .values(
+        [0, 1, 2].map((position) => ({
+          listing_id: id,
+          storage_prefix: `listings/${id}/photo-${position}`,
+          width: 1000,
+          height: 750,
+          position,
+        })),
+      )
+      .execute();
+    await h.app.inject({
+      method: 'POST',
+      url: `/api/v1/listings/${id}/publish`,
+      headers: { cookie: owner.cookie },
+    });
+
+    const patch = await h.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/listings/${id}`,
+      headers: { cookie: stranger.cookie },
+      payload: { title: 'Взлом' },
+    });
+    const amenities = await h.app.inject({
+      method: 'PUT',
+      url: `/api/v1/listings/${id}/amenities`,
+      headers: { cookie: stranger.cookie },
+      payload: { amenityIds: [] },
+    });
+
+    expect(patch.statusCode).toBe(404);
+    expect(amenities.statusCode).toBe(404);
+
+    const row = await h.db.kysely
+      .selectFrom('listings')
+      .select(['title', 'status'])
+      .where('id', '=', id)
+      .executeTakeFirstOrThrow();
+    expect(row).toEqual({ title: 'Дом у озера', status: 'published' });
   });
 
   it('не показывает чужое объявление в /me/listings', async () => {

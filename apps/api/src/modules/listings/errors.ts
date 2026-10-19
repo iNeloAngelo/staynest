@@ -56,6 +56,16 @@ export function listingIncomplete(issues: ListingPublishIssue[]): AppError {
   });
 }
 
+/** Страховка от нарушения CHECK в БД: наружу отдаём 422, а не 500. */
+export function listingInvalid(): AppError {
+  return new AppError({
+    status: 422,
+    code: 'listing_incomplete',
+    title: 'Unprocessable Entity',
+    detail: 'Проверьте обязательные поля объявления.',
+  });
+}
+
 export function invalidNightsRange(): AppError {
   return new AppError({
     status: 422,

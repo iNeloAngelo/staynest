@@ -23,6 +23,21 @@ export function findOwnedListing(
     .executeTakeFirst();
 }
 
+/** Блокирует строку на время транзакции: статус и брони не меняются под нами. */
+export function lockOwnedListing(
+  executor: DbExecutor,
+  ownerId: string,
+  id: string,
+): Promise<ListingRow | undefined> {
+  return executor
+    .selectFrom('listings')
+    .selectAll()
+    .where('id', '=', id)
+    .where('owner_id', '=', ownerId)
+    .forUpdate()
+    .executeTakeFirst();
+}
+
 export function listOwnedListings(executor: DbExecutor, ownerId: string): Promise<ListingRow[]> {
   return executor
     .selectFrom('listings')

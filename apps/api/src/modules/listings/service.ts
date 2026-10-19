@@ -15,6 +15,7 @@ import {
   listingAlreadyPublished,
   listingHasActiveBookings,
   listingIncomplete,
+  listingInvalid,
   listingNotDraft,
   listingNotPublished,
   listingNotFound,
@@ -34,6 +35,7 @@ import {
   listAmenitiesForListings,
   listListingAmenities,
   listOwnedListings,
+  lockOwnedListing,
   publishListing,
   replaceAmenities as replaceListingAmenities,
   updateListing,
@@ -73,10 +75,19 @@ async function requireOwned(
   executor: DbExecutor,
   ownerId: string,
   id: string,
+  lock = false,
 ): Promise<ListingRow> {
-  const row = await findOwnedListing(executor, ownerId, id);
+  const row = lock
+    ? await lockOwnedListing(executor, ownerId, id)
+    : await findOwnedListing(executor, ownerId, id);
   if (!row) throw listingNotFound();
   return row;
+}
+
+function isCheckViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23514'
+  );
 }
 
 function mergedFields(row: ListingRow, patch: ListingPatch): CompletenessFields {
@@ -116,13 +127,23 @@ function draftService({ db }: ListingServiceDependencies) {
     },
 
     async update(ownerId: string, id: string, input: UpdateListingInput): Promise<ListingDto> {
-      const row = await requireOwned(db.kysely, ownerId, id);
-      assertNightsRange(input.minNights ?? row.min_nights, input.maxNights ?? row.max_nights);
+      let updated: ListingRow;
 
-      const patch = toListingPatch(input);
-      assertStillComplete(row, patch);
+      try {
+        updated = await db.kysely.transaction().execute(async (trx) => {
+          const row = await requireOwned(trx, ownerId, id, true);
+          assertNightsRange(input.minNights ?? row.min_nights, input.maxNights ?? row.max_nights);
 
-      const updated = await updateListing(db.kysely, id, patch);
+          const patch = toListingPatch(input);
+          assertStillComplete(row, patch);
+
+          return updateListing(trx, id, patch);
+        });
+      } catch (error) {
+        if (isCheckViolation(error)) throw listingInvalid();
+        throw error;
+      }
+
       return withDetails(db.kysely, updated);
     },
 
@@ -131,15 +152,16 @@ function draftService({ db }: ListingServiceDependencies) {
       id: string,
       input: UpdateListingAmenitiesInput,
     ): Promise<ListingDto> {
-      const row = await requireOwned(db.kysely, ownerId, id);
-      const existing = await existingAmenityIds(db.kysely, input.amenityIds);
-      if (existing.length !== input.amenityIds.length) {
-        const found = new Set(existing);
-        throw amenityNotFound(input.amenityIds.filter((amenityId) => !found.has(amenityId)));
-      }
+      const row = await db.kysely.transaction().execute(async (trx) => {
+        const owned = await requireOwned(trx, ownerId, id, true);
+        const existing = await existingAmenityIds(trx, input.amenityIds);
+        if (existing.length !== input.amenityIds.length) {
+          const found = new Set(existing);
+          throw amenityNotFound(input.amenityIds.filter((amenityId) => !found.has(amenityId)));
+        }
 
-      await db.kysely.transaction().execute(async (trx) => {
         await replaceListingAmenities(trx, id, input.amenityIds);
+        return owned;
       });
 
       return withDetails(db.kysely, row);
@@ -150,15 +172,25 @@ function draftService({ db }: ListingServiceDependencies) {
 function statusService({ db, config, events }: ListingServiceDependencies) {
   return {
     async publish(actor: AuthContext, id: string): Promise<ListingDto> {
-      assertEmailVerified(config, actor);
-      const row = await requireOwned(db.kysely, actor.userId, id);
-      if (row.status === 'published') throw listingAlreadyPublished();
+      let updated: ListingRow;
 
-      const photos = await countPhotos(db.kysely, id);
-      const issues = publishIssues(row, photos);
-      if (issues.length > 0) throw listingIncomplete(issues);
+      try {
+        updated = await db.kysely.transaction().execute(async (trx) => {
+          const row = await requireOwned(trx, actor.userId, id, true);
+          assertEmailVerified(config, actor);
+          if (row.status === 'published') throw listingAlreadyPublished();
 
-      const updated = await publishListing(db.kysely, id, new Date());
+          const photos = await countPhotos(trx, id);
+          const issues = publishIssues(row, photos);
+          if (issues.length > 0) throw listingIncomplete(issues);
+
+          return publishListing(trx, id, new Date());
+        });
+      } catch (error) {
+        if (isCheckViolation(error)) throw listingInvalid();
+        throw error;
+      }
+
       events.publish('listing.published', {
         listingId: updated.id,
         ownerId: updated.owner_id,
@@ -169,18 +201,23 @@ function statusService({ db, config, events }: ListingServiceDependencies) {
     },
 
     async archive(ownerId: string, id: string): Promise<ListingDto> {
-      const row = await requireOwned(db.kysely, ownerId, id);
-      if (row.status !== 'published') throw listingNotPublished();
-      if (await hasActiveFutureBookings(db.kysely, id)) throw listingHasActiveBookings();
+      const updated = await db.kysely.transaction().execute(async (trx) => {
+        const row = await requireOwned(trx, ownerId, id, true);
+        if (row.status !== 'published') throw listingNotPublished();
+        if (await hasActiveFutureBookings(trx, id)) throw listingHasActiveBookings();
 
-      const updated = await archiveListing(db.kysely, id);
+        return archiveListing(trx, id);
+      });
+
       return withDetails(db.kysely, updated);
     },
 
     async remove(ownerId: string, id: string): Promise<void> {
-      const row = await requireOwned(db.kysely, ownerId, id);
-      if (row.status !== 'draft') throw listingNotDraft();
-      await deleteListing(db.kysely, id);
+      await db.kysely.transaction().execute(async (trx) => {
+        const row = await requireOwned(trx, ownerId, id, true);
+        if (row.status !== 'draft') throw listingNotDraft();
+        await deleteListing(trx, id);
+      });
     },
   };
 }

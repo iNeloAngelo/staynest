@@ -1,4 +1,11 @@
 import type { ListingPublishIssue } from '@staynest/shared';
+import {
+  MAX_LISTING_TITLE,
+  MIN_LISTING_TITLE,
+  MIN_PUBLISHED_DESCRIPTION,
+  MIN_PUBLISHED_PHOTOS,
+  textLength,
+} from '@staynest/shared';
 import { invalidNightsRange } from './errors';
 import type { ListingRow } from './repo';
 
@@ -24,20 +31,27 @@ type Check = [field: string, code: string, message: string, failed: boolean];
 export function completenessIssues(fields: CompletenessFields): ListingPublishIssue[] {
   const title = fields.title?.trim() ?? '';
   const description = fields.description.trim();
+  const titleLength = textLength(title);
 
   const checks: Check[] = [
     ['title', 'title_required', 'Укажите название объявления.', title === ''],
     [
       'title',
       'title_too_short',
-      'Название: не менее 5 символов.',
-      title !== '' && title.length < 5,
+      `Название: не менее ${MIN_LISTING_TITLE} символов.`,
+      title !== '' && titleLength < MIN_LISTING_TITLE,
+    ],
+    [
+      'title',
+      'title_too_long',
+      `Название: не длиннее ${MAX_LISTING_TITLE} символов.`,
+      titleLength > MAX_LISTING_TITLE,
     ],
     [
       'description',
       'description_too_short',
-      'Описание: не менее 50 символов.',
-      description.length < 50,
+      `Описание: не менее ${MIN_PUBLISHED_DESCRIPTION} символов.`,
+      textLength(description) < MIN_PUBLISHED_DESCRIPTION,
     ],
     ['city', 'city_required', 'Укажите город.', !fields.city?.trim()],
     ['addressLine', 'address_required', 'Укажите адрес.', !fields.address_line?.trim()],
@@ -63,8 +77,10 @@ export function publishIssues(
 ): ListingPublishIssue[] {
   const issues = completenessIssues(fields);
 
-  if (photoCount < 3) {
-    issues.push(issue('photos', 'photos_too_few', 'Добавьте минимум 3 фотографии.'));
+  if (photoCount < MIN_PUBLISHED_PHOTOS) {
+    issues.push(
+      issue('photos', 'photos_too_few', `Добавьте минимум ${MIN_PUBLISHED_PHOTOS} фотографии.`),
+    );
   }
 
   return issues;
