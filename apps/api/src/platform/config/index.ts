@@ -7,6 +7,17 @@ const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace
 
 const DEV_JWT_SECRET = 'dev-only-jwt-secret-change-me-before-production';
 
+function isTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const timeZoneSchema = z.string().min(1).refine(isTimeZone, 'Неизвестная таймзона IANA.');
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_HOST: z.string().min(1).default('0.0.0.0'),
@@ -19,6 +30,8 @@ const envSchema = z.object({
 
   APP_WEB_URL: z.string().url().default('http://localhost:5173'),
   REQUIRE_EMAIL_VERIFICATION: z.enum(['true', 'false']).default('true'),
+  /** Таймзона объявлений: «сегодня» для заезда и календаря. В MVP одна на инстанс. */
+  LISTING_TIME_ZONE: timeZoneSchema.default('Europe/Moscow'),
 
   JWT_SECRET: z.preprocess(
     (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
@@ -107,6 +120,7 @@ export type AppConfig = {
   trustProxy: boolean;
   dbQueryTimeoutMs: number;
   webAppUrl: string;
+  listingTimeZone: string;
   auth: AuthConfig;
   mail: MailConfig;
   storage: StorageConfig;
@@ -194,6 +208,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     trustProxy: data.TRUST_PROXY === 'true',
     dbQueryTimeoutMs: data.DB_QUERY_TIMEOUT_MS,
     webAppUrl: data.APP_WEB_URL.replace(/\/+$/, ''),
+    listingTimeZone: data.LISTING_TIME_ZONE,
     auth: {
       jwtSecret: data.JWT_SECRET?.trim() || DEV_JWT_SECRET,
       accessTokenTtlSeconds: data.ACCESS_TOKEN_TTL_SECONDS,

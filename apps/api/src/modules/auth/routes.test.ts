@@ -66,6 +66,7 @@ function makeConfig(): AppConfig {
     trustProxy: false,
     dbQueryTimeoutMs: 5000,
     webAppUrl: 'http://localhost:5173',
+    listingTimeZone: 'Europe/Moscow',
     auth: {
       jwtSecret: JWT_SECRET,
       accessTokenTtlSeconds: 900,

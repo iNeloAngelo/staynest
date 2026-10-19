@@ -7,6 +7,7 @@ export type OwnedListingRef = {
   id: string;
   status: ListingStatus;
   coverPhotoId: string | null;
+  maxNights: number;
 };
 
 /**
@@ -25,5 +26,10 @@ export async function requireOwnedListing(
 
   if (!row) throw listingNotFound();
 
-  return { id: row.id, status: row.status, coverPhotoId: row.cover_photo_id };
+  return {
+    id: row.id,
+    status: row.status,
+    coverPhotoId: row.cover_photo_id,
+    maxNights: row.max_nights,
+  };
 }

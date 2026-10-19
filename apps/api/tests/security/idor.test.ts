@@ -57,6 +57,39 @@ const LISTING_ATTACKS: Attack[] = [
     method: 'DELETE',
     path: (id) => `/api/v1/listings/${id}/photos/${randomUUID()}`,
   },
+  {
+    name: 'POST сезонного правила',
+    method: 'POST',
+    path: (id) => `/api/v1/listings/${id}/price-rules`,
+    payload: {
+      name: 'Взлом',
+      dateFrom: '2030-07-01',
+      dateTo: '2030-07-31',
+      nightlyPriceMinor: 100_000,
+    },
+  },
+  {
+    name: 'PATCH сезонного правила',
+    method: 'PATCH',
+    path: (id) => `/api/v1/listings/${id}/price-rules/${randomUUID()}`,
+    payload: { nightlyPriceMinor: 100_000 },
+  },
+  {
+    name: 'DELETE сезонного правила',
+    method: 'DELETE',
+    path: (id) => `/api/v1/listings/${id}/price-rules/${randomUUID()}`,
+  },
+  {
+    name: 'POST блокировки',
+    method: 'POST',
+    path: (id) => `/api/v1/listings/${id}/blocks`,
+    payload: { dateFrom: '2030-07-10', dateTo: '2030-07-12' },
+  },
+  {
+    name: 'DELETE блокировки',
+    method: 'DELETE',
+    path: (id) => `/api/v1/listings/${id}/blocks/${randomUUID()}`,
+  },
 ];
 
 async function setupPair(): Promise<{
@@ -203,6 +236,19 @@ describeDatabase('IDOR: объявления', () => {
       .where('id', '=', id)
       .executeTakeFirstOrThrow();
     expect(row).toEqual({ title: 'Дом у озера', status: 'published' });
+  });
+
+  it('не показывает чужой календарь хозяина', async () => {
+    const { h, stranger, id } = await setupPair();
+
+    const response = await h.app.inject({
+      method: 'GET',
+      url: `/api/v1/listings/${id}/calendar/host?from=2030-07-01&to=2030-07-31`,
+      headers: { cookie: stranger.cookie },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ code: 'listing_not_found' });
   });
 
   it('не показывает чужое объявление в /me/listings', async () => {

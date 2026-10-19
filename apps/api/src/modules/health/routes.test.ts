@@ -15,6 +15,7 @@ const config: AppConfig = {
   trustProxy: false,
   dbQueryTimeoutMs: 5000,
   webAppUrl: 'http://localhost:5173',
+  listingTimeZone: 'Europe/Moscow',
   auth: {
     jwtSecret: 'test-secret-with-at-least-32-characters',
     accessTokenTtlSeconds: 900,
