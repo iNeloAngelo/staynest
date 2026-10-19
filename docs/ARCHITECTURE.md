@@ -11,7 +11,7 @@
 | Блок (как ты его называешь) | Модуль бэкенда `apps/api/src/modules/` | Фича фронтенда `apps/web/src/features/` | Таблицы (владелец) |
 |---|---|---|---|
 | **Участники** (аккаунты, профиль) | `auth`, `users` | `auth`, `profile`, `mode-switch` | `users`, `refresh_tokens`, `auth_tokens`, `telegram_identities` |
-| **Дома** (объявления) | `listings` | `listing-editor` (мастер), `listing-details` | `listings`, `listing_amenities`, `amenities` |
+| **Дома** (объявления) | `listings` | `listings` (мои объявления и черновик), `listing-editor` (мастер, Сессия 7), `listing-details` | `listings`, `listing_amenities`, `amenities` |
 | Фото домов | `photos` | `photo-uploader`, `photo-gallery` | `listing_photos` |
 | Цены | `pricing` | `price-editor` | `listing_price_rules` |
 | Доступность и календарь | `availability` | `calendar` | `listing_blocks` |
