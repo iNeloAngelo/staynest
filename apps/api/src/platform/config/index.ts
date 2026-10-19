@@ -13,7 +13,7 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().max(65_535).default(3100),
   LOG_LEVEL: logLevelSchema.default('info'),
   DATABASE_URL: z.string().min(1).default('postgres://staynest:staynest@localhost:5433/staynest'),
-  CORS_ORIGINS: z.string().default('http://localhost:5173'),
+  CORS_ORIGINS: z.string().default('http://localhost:5173,http://127.0.0.1:5173'),
   TRUST_PROXY: z.enum(['true', 'false']).default('false'),
   DB_QUERY_TIMEOUT_MS: z.coerce.number().int().positive().max(60_000).default(5000),
 
