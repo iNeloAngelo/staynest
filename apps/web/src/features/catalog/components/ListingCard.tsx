@@ -49,6 +49,8 @@ export function ListingCard({
   const { locale } = useLocale();
   const location = useLocation();
   const price = formatMoney(listing.basePriceMinor, locale, listing.currency);
+  const stay = listing.stayPrice;
+  const stayPrice = stay ? formatMoney(stay.totalMinor, locale, stay.currency) : null;
 
   return (
     <Link
@@ -76,7 +78,9 @@ export function ListingCard({
         </p>
 
         <p className="mt-auto pt-2 text-body font-semibold text-ink tabular-nums">
-          {t('catalog.card.perNight', { price })}
+          {stay && stayPrice
+            ? t('catalog.card.stayTotal', { price: stayPrice, count: stay.nights })
+            : t('catalog.card.perNight', { price })}
         </p>
       </div>
     </Link>

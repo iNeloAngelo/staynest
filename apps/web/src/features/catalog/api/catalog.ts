@@ -12,6 +12,10 @@ function searchParams(filters: CatalogFilters, cursor: string | null): URLSearch
 
   if (filters.q.trim()) params.set('q', filters.q.trim());
   if (filters.city.trim()) params.set('city', filters.city.trim());
+  if (filters.checkIn && filters.checkOut) {
+    params.set('check_in', filters.checkIn);
+    params.set('check_out', filters.checkOut);
+  }
   if (filters.guests !== null) params.set('guests', String(filters.guests));
   if (filters.priceMin !== null) params.set('priceMin', String(filters.priceMin));
   if (filters.priceMax !== null) params.set('priceMax', String(filters.priceMax));

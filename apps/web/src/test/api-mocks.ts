@@ -119,6 +119,7 @@ export const demoPublicListing: PublicListingSummary = {
   maxNights: 14,
   coverPhoto: demoPhoto,
   photoCount: 3,
+  stayPrice: null,
   publishedAt: '2026-10-01T10:00:00.000Z',
 };
 

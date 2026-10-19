@@ -12,13 +12,15 @@ describe('parseCatalogFilters', () => {
   it('читает фильтры из URL и отбрасывает невалидные значения', () => {
     const filters = parseCatalogFilters(
       new URLSearchParams(
-        'q=озеро&city=Суздаль&guests=4&priceMin=300000&priceMax=900000&bedroomsMin=2&type=house,villa,palace&amenities=1,3,3,x&sort=price_asc',
+        'q=озеро&city=Суздаль&checkIn=2026-12-10&checkOut=2026-12-12&guests=4&priceMin=300000&priceMax=900000&bedroomsMin=2&type=house,villa,palace&amenities=1,3,3,x&sort=price_asc',
       ),
     );
 
     expect(filters).toEqual({
       q: 'озеро',
       city: 'Суздаль',
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
       guests: 4,
       priceMin: 300_000,
       priceMax: 900_000,
@@ -36,6 +38,19 @@ describe('parseCatalogFilters', () => {
 
     expect(filters.types).toEqual(['house', 'villa']);
     expect(filters.amenities).toEqual([1, 3, 4]);
+  });
+
+  it('отбрасывает неполный и перевёрнутый диапазон дат', () => {
+    expect(parseCatalogFilters(new URLSearchParams('checkIn=2026-12-10')).checkIn).toBeNull();
+    expect(
+      parseCatalogFilters(new URLSearchParams('checkIn=2026-12-12&checkOut=2026-12-10')),
+    ).toMatchObject({ checkIn: null, checkOut: null });
+    expect(
+      parseCatalogFilters(new URLSearchParams('checkIn=2026-02-30&checkOut=2026-03-02')),
+    ).toMatchObject({ checkIn: null, checkOut: null });
+    expect(
+      parseCatalogFilters(new URLSearchParams('checkIn=2026-01-01&checkOut=2028-01-01')),
+    ).toMatchObject({ checkIn: null, checkOut: null });
   });
 
   it('возвращает пустые фильтры для пустого URL', () => {
@@ -59,6 +74,8 @@ describe('filtersToSearchParams', () => {
     const filters = {
       q: ' озеро ',
       city: 'Суздаль',
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
       guests: 2,
       priceMin: 300_000,
       priceMax: null,
@@ -71,7 +88,7 @@ describe('filtersToSearchParams', () => {
     const params = filtersToSearchParams(filters);
 
     expect(params.toString()).toBe(
-      'q=%D0%BE%D0%B7%D0%B5%D1%80%D0%BE&city=%D0%A1%D1%83%D0%B7%D0%B4%D0%B0%D0%BB%D1%8C&guests=2&priceMin=300000&bedroomsMin=1&type=house&amenities=1%2C2&sort=price_desc',
+      'q=%D0%BE%D0%B7%D0%B5%D1%80%D0%BE&city=%D0%A1%D1%83%D0%B7%D0%B4%D0%B0%D0%BB%D1%8C&checkIn=2026-12-10&checkOut=2026-12-12&guests=2&priceMin=300000&bedroomsMin=1&type=house&amenities=1%2C2&sort=price_desc',
     );
     expect(parseCatalogFilters(params)).toMatchObject({ ...filters, q: 'озеро' });
   });
@@ -95,6 +112,9 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters(EMPTY_FILTERS)).toBe(false);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, city: 'Суздаль' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, amenities: [1] })).toBe(true);
+    expect(
+      hasActiveFilters({ ...EMPTY_FILTERS, checkIn: '2026-12-10', checkOut: '2026-12-12' }),
+    ).toBe(true);
   });
 });
 
