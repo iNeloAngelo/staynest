@@ -4,9 +4,19 @@ const REDACT_PATHS = [
   'req.headers.cookie',
   'req.headers.authorization',
   'res.headers["set-cookie"]',
+  'req.body.password',
+  'req.body.email',
+  'req.body.token',
   '*.password',
+  '*.passwordHash',
   '*.token',
+  '*.accessToken',
+  '*.refreshToken',
   '*.secret',
+  '*.authorization',
+  '*.cookie',
+  '*.email',
+  '*.phone',
 ];
 
 export function createLogger(level: string, pretty: boolean): Logger {

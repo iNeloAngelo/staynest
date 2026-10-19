@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { config as loadEnv } from 'dotenv';
+import { loadEnvFile } from 'node:process';
 import { z } from 'zod';
 
 const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
@@ -12,6 +12,7 @@ const envSchema = z.object({
   LOG_LEVEL: logLevelSchema.default('info'),
   DATABASE_URL: z.string().min(1).default('postgres://staynest:staynest@localhost:5433/staynest'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
+  TRUST_PROXY: z.enum(['true', 'false']).default('false'),
 });
 
 type LogLevel = z.infer<typeof logLevelSchema>;
@@ -23,12 +24,13 @@ export type AppConfig = {
   logLevel: LogLevel;
   databaseUrl: string;
   corsOrigins: string[];
+  trustProxy: boolean;
 };
 
 function loadDotEnvFiles(): void {
   for (const file of ['.env', '../../.env']) {
     const path = resolve(process.cwd(), file);
-    if (existsSync(path)) loadEnv({ path, quiet: true });
+    if (existsSync(path)) loadEnvFile(path);
   }
 }
 
@@ -45,6 +47,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   const data = parsed.data;
 
+  if (data.NODE_ENV === 'production') {
+    const missing = ['DATABASE_URL', 'CORS_ORIGINS'].filter((key) => !env[key]?.trim());
+    if (missing.length > 0) {
+      throw new Error(`В production обязательны переменные окружения: ${missing.join(', ')}`);
+    }
+  }
+
   return {
     nodeEnv: data.NODE_ENV,
     host: data.API_HOST,
@@ -54,5 +63,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     corsOrigins: data.CORS_ORIGINS.split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
+    trustProxy: data.TRUST_PROXY === 'true',
   };
 }

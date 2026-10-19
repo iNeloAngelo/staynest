@@ -17,6 +17,9 @@ export const healthRoutes: FastifyPluginAsync<HealthRoutesOptions> = async (app,
       uptime: Math.round(process.uptime()),
     };
 
-    return reply.status(dbStatus === 'up' ? 200 : 503).send(body);
+    return reply
+      .header('cache-control', 'no-store')
+      .status(dbStatus === 'up' ? 200 : 503)
+      .send(body);
   });
 };

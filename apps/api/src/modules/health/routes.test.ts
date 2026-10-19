@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from '../../app';
 import type { AppConfig } from '../../platform/config/index';
 import type { Db } from '../../platform/db/index';
+import { AppError } from '../../platform/http/errors';
 import { createLogger } from '../../platform/logger/index';
 
 const config: AppConfig = {
@@ -11,6 +12,7 @@ const config: AppConfig = {
   logLevel: 'silent',
   databaseUrl: 'postgres://unused',
   corsOrigins: ['http://localhost:5173'],
+  trustProxy: false,
 };
 
 const logger = createLogger('silent', false);
@@ -23,22 +25,27 @@ function dbWith(status: 'up' | 'down'): Db {
   };
 }
 
+async function appWithDb(status: 'up' | 'down') {
+  return buildApp({ config, logger, db: dbWith(status) });
+}
+
 describe('GET /api/v1/health', () => {
   it('возвращает ok, когда база доступна', async () => {
-    const app = await buildApp({ config, logger, db: dbWith('up') });
+    const app = await appWithDb('up');
 
     const response = await app.inject({ method: 'GET', url: '/api/v1/health' });
 
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('application/json');
     expect(response.headers['x-request-id']).toBeTruthy();
+    expect(response.headers['cache-control']).toBe('no-store');
     expect(response.json()).toMatchObject({ status: 'ok', db: 'up' });
 
     await app.close();
   });
 
   it('возвращает 503, когда база недоступна', async () => {
-    const app = await buildApp({ config, logger, db: dbWith('down') });
+    const app = await appWithDb('down');
 
     const response = await app.inject({ method: 'GET', url: '/api/v1/health' });
 
@@ -49,13 +56,91 @@ describe('GET /api/v1/health', () => {
   });
 
   it('отдаёт problem+json на неизвестный маршрут', async () => {
-    const app = await buildApp({ config, logger, db: dbWith('up') });
+    const app = await appWithDb('up');
 
     const response = await app.inject({ method: 'GET', url: '/api/v1/missing' });
 
     expect(response.statusCode).toBe(404);
     expect(response.headers['content-type']).toContain('application/problem+json');
     expect(response.json()).toMatchObject({ status: 404, code: 'not_found' });
+
+    await app.close();
+  });
+
+  it('не раскрывает внутреннюю ошибку в 500', async () => {
+    const app = await appWithDb('up');
+    app.get('/boom', async () => {
+      throw new Error('secret internal detail');
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/boom' });
+    const body = response.json() as Record<string, unknown>;
+
+    expect(response.statusCode).toBe(500);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(body).toMatchObject({ status: 500, code: 'internal_error' });
+    expect(JSON.stringify(body)).not.toContain('secret internal detail');
+
+    await app.close();
+  });
+
+  it('отдаёт код и безопасный текст для AppError', async () => {
+    const app = await appWithDb('up');
+    app.get('/conflict', async () => {
+      throw new AppError({
+        status: 409,
+        code: 'booking_dates_unavailable',
+        title: 'Conflict',
+        detail: 'Эти даты уже заняты.',
+      });
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/conflict' });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      status: 409,
+      code: 'booking_dates_unavailable',
+      detail: 'Эти даты уже заняты.',
+    });
+
+    await app.close();
+  });
+
+  it('отдаёт problem+json на битый JSON', async () => {
+    const app = await appWithDb('up');
+    app.post('/echo', async (request) => request.body);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/echo',
+      headers: { 'content-type': 'application/json' },
+      payload: '{"broken":',
+    });
+    const body = response.json() as Record<string, unknown>;
+
+    expect(response.statusCode).toBe(400);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(body).toMatchObject({ status: 400, code: 'bad_request' });
+    expect(JSON.stringify(body)).not.toContain('Unexpected');
+
+    await app.close();
+  });
+
+  it('отдаёт problem+json на слишком большое тело', async () => {
+    const app = await appWithDb('up');
+    app.post('/echo', async (request) => request.body);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/echo',
+      headers: { 'content-type': 'application/json' },
+      payload: JSON.stringify({ data: 'x'.repeat(1024 * 1024) }),
+    });
+
+    expect(response.statusCode).toBe(413);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(response.json()).toMatchObject({ status: 413, code: 'payload_too_large' });
 
     await app.close();
   });

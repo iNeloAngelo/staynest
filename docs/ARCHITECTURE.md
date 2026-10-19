@@ -125,7 +125,8 @@ apps/web/src/
 | Вложенность | 4 уровня |
 
 Инструменты:
-- ESLint: `max-lines`, `max-lines-per-function`, `complexity`, `max-params`, `max-depth`, `no-restricted-imports` (запрет глубоких импортов `modules/*/!(index)`), `eslint-plugin-boundaries` или аналог.
+- ESLint: `max-lines`, `max-lines-per-function`, `complexity`, `max-params`, `max-depth`, запрет `eval` и `dangerouslySetInnerHTML`.
+- Границы модулей проверяет dependency-cruiser (`pnpm depcheck`): запрет циклов, импорт чужого модуля только через `index.ts`, `platform` не зависит от `modules`, `shared` не зависит от `features`. Отдельный плагин boundaries не добавляется, чтобы не тянуть лишнюю зависимость; правило проверено тестом с временным глубоким импортом.
 - **dependency-cruiser** в CI: правила "нет циклов", "модуль импортирует только index.ts другого модуля", "platform не зависит от modules", "shared не зависит от features". Граф зависимостей кладётся в `docs/architecture/deps.svg` (сильная иллюстрация для кейса).
 - `knip`: поиск мёртвого кода и неиспользуемых экспортов.
 

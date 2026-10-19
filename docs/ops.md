@@ -123,7 +123,7 @@ mkdir -p /opt/staynest && chown deploy:deploy /opt/staynest
 ## 7. Деплой (Сессия 17)
 
 1. Код на сервере: `git clone` в `/opt/staynest` (или `git pull` по тегу).
-2. `.env` создаётся на сервере из `.env.example`, права `600`.
+2. `.env` создаётся на сервере из `.env.example`, права `600`. В проде `NODE_ENV=production`, `TRUST_PROXY=true` (API доступен только через Caddy), порт API наружу не публикуется.
 3. Сборка образов, миграции **отдельной командой**, затем `docker compose up -d`.
 4. Проверка: `/health` отвечает `ok` с `db: up`, сайт по HTTPS, демо-сценарий.
 5. Бэкап-джоб и проверенное восстановление — до объявления деплоя успешным.

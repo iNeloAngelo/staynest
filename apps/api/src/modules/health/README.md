@@ -22,7 +22,7 @@
 
 ```bash
 pnpm --filter @staynest/api test
-curl -i http://localhost:3000/api/v1/health
+curl -i http://localhost:3100/api/v1/health
 ```
 
 Тесты используют `app.inject()` и подменяют `db.check`, поэтому база для юнит-тестов не нужна.
