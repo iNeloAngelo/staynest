@@ -27,6 +27,9 @@
     "db:reset": "node scripts/db-reset.mjs",
     "db:reset:test": "node scripts/db-reset.mjs --test",
     "db:codegen": "node scripts/db-codegen.mjs",
+    "seed:perf": "node scripts/seed-perf.mjs",
+    "perf:search": "node scripts/perf-search.mjs",
+    "perf:http": "node scripts/perf-http.mjs",
     "icons:generate": "node scripts/generate-pwa-icons.mjs"
   },
   "devDependencies": {
