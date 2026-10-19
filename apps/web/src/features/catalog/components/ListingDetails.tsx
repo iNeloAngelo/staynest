@@ -6,6 +6,7 @@ import { ApiError } from '../../../shared/api';
 import { Button } from '../../../shared/ui/Button';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { useListing } from '../api/hooks';
+import { BookingAside, MobileBooking } from './BookingWidgets';
 import { PhotoGallery } from './PhotoGallery';
 import {
   Amenities,
@@ -13,8 +14,6 @@ import {
   DetailsSkeleton,
   Facts,
   LocationSection,
-  MobilePriceBar,
-  PriceBlock,
 } from './ListingDetailsSections';
 
 function ListingContent({ listing }: { listing: PublicListing }) {
@@ -60,10 +59,10 @@ function ListingContent({ listing }: { listing: PublicListing }) {
           <LocationSection listing={listing} />
         </div>
 
-        <PriceBlock listing={listing} />
+        <BookingAside listing={listing} />
       </div>
 
-      <MobilePriceBar listing={listing} />
+      <MobileBooking listing={listing} />
     </article>
   );
 }

@@ -52,10 +52,7 @@ function TileControls({
   onCover,
   onMove,
   onRemove,
-}: Omit<
-  PhotoTileProps,
-  'dragging' | 'onDragStart' | 'onDragEnd' | 'onDrop' | 'onFiles'
->) {
+}: Omit<PhotoTileProps, 'dragging' | 'onDragStart' | 'onDragEnd' | 'onDrop' | 'onFiles'>) {
   const { t } = useTranslation();
 
   return (

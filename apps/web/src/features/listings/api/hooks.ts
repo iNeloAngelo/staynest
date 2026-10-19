@@ -66,10 +66,15 @@ export function useCreateListing() {
 
 export function useUpdateListing(id: string) {
   const invalidate = useInvalidateMine();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (input: UpdateListingInput) => updateListing(id, input),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      void queryClient.invalidateQueries({ queryKey: ['catalog'] });
+      void queryClient.invalidateQueries({ queryKey: ['booking'] });
+    },
   });
 }
 

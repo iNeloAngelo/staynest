@@ -29,7 +29,7 @@ export function minorToInput(minor: number | null): string {
 }
 
 export function inputToMinor(value: string): number | null {
-  const normalized = value.trim().replace(',', '.');
+  const normalized = value.trim().replace(/\s+/g, '').replace(',', '.');
   if (normalized === '') return null;
 
   const parsed = Number(normalized);

@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ModeProvider } from '../features/mode-switch';
+import { addDays } from '@staynest/shared';
+import { formatLongDate, todayLocalIso } from '../shared/lib/dates';
 import { ToastProvider } from '../shared/ui';
 import {
   completeListing,
@@ -30,6 +32,27 @@ function renderApp(initialEntries: string[]) {
       </ModeProvider>
     </QueryClientProvider>,
   );
+}
+
+function findDayButton(date: string, status = 'доступно'): HTMLElement {
+  const label = formatLongDate(date, 'ru');
+  const button = screen
+    .getAllByRole('button')
+    .find(
+      (element) =>
+        (element.getAttribute('aria-label') ?? '').includes(label) &&
+        (element.getAttribute('aria-label') ?? '').includes(status),
+    );
+
+  if (!button) {
+    const labels = screen
+      .getAllByRole('button')
+      .map((element) => element.getAttribute('aria-label') ?? element.textContent)
+      .filter(Boolean)
+      .join(' | ');
+    throw new Error(`Не найдена кнопка дня ${date} со статусом ${status}. Кнопки: ${labels}`);
+  }
+  return button;
 }
 
 afterEach(() => {
@@ -431,5 +454,116 @@ describe('App', () => {
     expect((await screen.findAllByText(/Нет сети/)).length).toBeGreaterThan(0);
     expect(await screen.findByRole('button', { name: 'Сохранить' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Опубликовать' })).toBeDisabled();
+  });
+
+  it('показывает расчёт стоимости из ответа сервера', async () => {
+    const quoteRequests: string[] = [];
+    mockApi({
+      onRequest: (url) => {
+        if (url.includes('/quote?')) quoteRequests.push(decodeURIComponent(url));
+      },
+    });
+    const user = userEvent.setup();
+    renderApp([`/listings/${demoPublicListing.id}`]);
+
+    await screen.findByRole('heading', { name: 'Дом у озера', level: 1 });
+    await screen.findByRole('heading', { name: 'Даты и стоимость' });
+    const checkIn = addDays(todayLocalIso(), 1);
+    const checkOut = addDays(todayLocalIso(), 3);
+
+    await user.click(findDayButton(checkIn));
+    await user.click(findDayButton(checkOut));
+
+    expect(await screen.findByText('Итого')).toBeInTheDocument();
+    expect(screen.getAllByText(/16\s?500/).length).toBeGreaterThan(0);
+
+    await waitFor(() => {
+      const request = quoteRequests.at(-1) ?? '';
+      expect(request).toContain(`checkIn=${checkIn}`);
+      expect(request).toContain(`checkOut=${checkOut}`);
+      expect(request).toContain('guests=1');
+    });
+  });
+
+  it('разрешает выезд в занятую ночь следующего гостя', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderApp([`/listings/${demoPublicListing.id}`]);
+
+    await screen.findByRole('heading', { name: 'Дом у озера', level: 1 });
+    await screen.findByRole('heading', { name: 'Даты и стоимость' });
+    const checkIn = addDays(todayLocalIso(), 3);
+    const busyCheckout = addDays(todayLocalIso(), 5);
+
+    await user.click(findDayButton(checkIn));
+    await user.click(findDayButton(busyCheckout, 'занято'));
+
+    expect(await screen.findByText('Итого')).toBeInTheDocument();
+    expect(
+      screen.getAllByText(new RegExp(formatLongDate(busyCheckout, 'ru'))).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('не даёт перепрыгнуть занятую ночь и переносит начало', async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderApp([`/listings/${demoPublicListing.id}`]);
+
+    await screen.findByRole('heading', { name: 'Дом у озера', level: 1 });
+    await screen.findByRole('heading', { name: 'Даты и стоимость' });
+    await user.click(findDayButton(addDays(todayLocalIso(), 4)));
+    await user.click(findDayButton(addDays(todayLocalIso(), 7)));
+
+    expect(await screen.findByText(/Через занятые ночи выбрать нельзя/)).toBeInTheDocument();
+    expect(screen.queryByText('Итого')).not.toBeInTheDocument();
+  });
+
+  it('показывает загрузку, а не ошибку, пока календарь хозяина грузится', async () => {
+    mockApi({
+      user: demoUser,
+      listings: [{ ...completeListing, status: 'published' }],
+      pendingHostCalendar: true,
+    });
+    renderApp(['/host/calendar']);
+
+    expect((await screen.findAllByText('Загружаем…')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Не удалось загрузить календарь')).not.toBeInTheDocument();
+  });
+
+  it('блокирует выбранные даты в календаре хозяина', async () => {
+    const requests: Array<{ url: string; body: unknown }> = [];
+    mockApi({
+      user: demoUser,
+      listings: [{ ...completeListing, status: 'published' }],
+      onRequest: (url, init) => {
+        if (init?.method === 'POST' && url.includes('/blocks')) {
+          requests.push({ url, body: JSON.parse(String(init.body)) as unknown });
+        }
+      },
+    });
+    const user = userEvent.setup();
+    renderApp(['/host/calendar']);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Календарь и цены', level: 1 }),
+    ).toBeInTheDocument();
+    await screen.findByText('Заявка');
+
+    const checkIn = addDays(todayLocalIso(), 1);
+    const checkOut = addDays(todayLocalIso(), 3);
+    await user.click(findDayButton(checkIn));
+    await user.click(findDayButton(checkOut));
+
+    expect(await screen.findByRole('dialog', { name: 'Заблокировать даты' })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Причина'), 'Ремонт');
+    await user.click(screen.getByRole('button', { name: 'Заблокировать' }));
+
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]?.body).toEqual({
+      dateFrom: checkIn,
+      dateTo: addDays(checkOut, -1),
+      reason: 'Ремонт',
+    });
+    expect(await screen.findByText('Даты заблокированы')).toBeInTheDocument();
   });
 });

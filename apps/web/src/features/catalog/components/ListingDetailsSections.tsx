@@ -1,5 +1,6 @@
 import type { AmenityDto, PublicListing } from '@staynest/shared';
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
   AirVent,
   Baby,
@@ -24,6 +25,7 @@ import {
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '../../../shared/i18n';
+import { cn } from '../../../shared/lib/cn';
 import { formatMoney } from '../../../shared/lib/format';
 import { Button } from '../../../shared/ui/Button';
 import { Skeleton, SkeletonText } from '../../../shared/ui/Skeleton';
@@ -189,7 +191,15 @@ export function LocationSection({ listing }: { listing: PublicListing }) {
   );
 }
 
-export function PriceBlock({ listing }: { listing: PublicListing }) {
+export function PriceBlock({
+  listing,
+  children,
+  className,
+}: {
+  listing: PublicListing;
+  children?: ReactNode;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const { locale } = useLocale();
   const price = formatMoney(listing.basePriceMinor, locale, listing.currency);
@@ -200,7 +210,12 @@ export function PriceBlock({ listing }: { listing: PublicListing }) {
   const cleaning = formatMoney(listing.cleaningFeeMinor, locale, listing.currency);
 
   return (
-    <aside className="h-fit rounded-lg border border-border bg-surface p-5 shadow-md lg:sticky lg:top-24">
+    <aside
+      className={cn(
+        'h-fit rounded-lg border border-border bg-surface p-5 shadow-md lg:sticky lg:top-24',
+        className,
+      )}
+    >
       <p className="text-body text-ink-muted">
         {t('listing.price.from')} <span className="text-h1 font-semibold text-ink">{price}</span>{' '}
         {t('listing.price.perNight')}
@@ -235,17 +250,18 @@ export function PriceBlock({ listing }: { listing: PublicListing }) {
         </div>
       </dl>
 
-      <Button fullWidth size="lg" className="mt-5" disabled aria-describedby="booking-soon">
-        {t('listing.chooseDates')}
-      </Button>
-      <p id="booking-soon" className="mt-2 text-center text-caption text-ink-muted">
-        {t('listing.bookingSoon')}
-      </p>
+      {children ? <div className="mt-5 border-t border-border pt-5">{children}</div> : null}
     </aside>
   );
 }
 
-export function MobilePriceBar({ listing }: { listing: PublicListing }) {
+export function MobilePriceBar({
+  listing,
+  onOpen,
+}: {
+  listing: PublicListing;
+  onOpen: () => void;
+}) {
   const { t } = useTranslation();
   const { locale } = useLocale();
   const price = formatMoney(listing.basePriceMinor, locale, listing.currency);
@@ -256,12 +272,7 @@ export function MobilePriceBar({ listing }: { listing: PublicListing }) {
         {t('listing.price.from')}{' '}
         <span className="text-h3 font-semibold text-ink tabular-nums">{price}</span>
       </p>
-      <Button disabled aria-describedby="booking-soon-mobile">
-        {t('listing.chooseDates')}
-      </Button>
-      <span id="booking-soon-mobile" className="sr-only">
-        {t('listing.bookingSoon')}
-      </span>
+      <Button onClick={onOpen}>{t('listing.chooseDates')}</Button>
     </div>
   );
 }

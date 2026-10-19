@@ -5,6 +5,8 @@ describe('money helpers', () => {
   it('переводит рубли в копейки и обратно', () => {
     expect(inputToMinor('7500')).toBe(750_000);
     expect(inputToMinor('7500,5')).toBe(750_050);
+    expect(inputToMinor('7 500')).toBe(750_000);
+    expect(inputToMinor('7\u00A0500,50')).toBe(750_050);
     expect(minorToInput(750_000)).toBe('7500');
     expect(minorToInput(null)).toBe('');
   });

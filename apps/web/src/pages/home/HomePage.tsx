@@ -19,9 +19,7 @@ function HostHome() {
           {t('home.host.title')}
         </h1>
 
-        <p className="max-w-prose text-body text-ink-muted lg:text-h3">
-          {t('home.host.subtitle')}
-        </p>
+        <p className="max-w-prose text-body text-ink-muted lg:text-h3">{t('home.host.subtitle')}</p>
       </section>
 
       <EmptyState

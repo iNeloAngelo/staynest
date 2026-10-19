@@ -1,11 +1,18 @@
 import type {
+  BlockDto,
+  CalendarResponse,
+  HostCalendarResponse,
   ListingDto,
   ListingPhotoDto,
+  PriceRuleDto,
   PublicListing,
   PublicListingSummary,
+  Quote,
   UserDto,
 } from '@staynest/shared';
+import { addDays, nightsBetween } from '@staynest/shared';
 import { vi } from 'vitest';
+import { todayLocalIso } from '../shared/lib/dates';
 
 export const demoUser: UserDto = {
   id: '3d0f2f4b-8c47-4d0a-9d55-6f8f1f8b5a11',
@@ -130,6 +137,59 @@ export const demoPublicDetail: PublicListing = {
   amenities: demoAmenities,
 };
 
+export function demoCalendar(listingId = demoPublicListing.id): CalendarResponse {
+  const today = todayLocalIso();
+  return {
+    listingId,
+    from: addDays(today, -1),
+    to: addDays(today, 366),
+    today,
+    minNights: 2,
+    maxNights: 14,
+    basePriceMinor: 750_000,
+    weekendPriceMinor: 850_000,
+    cleaningFeeMinor: 150_000,
+    currency: 'RUB',
+    unavailable: [{ date: addDays(today, 5), kind: 'booked' }],
+  };
+}
+
+function demoQuote(url: string): Quote {
+  const params = new URL(url, 'http://localhost').searchParams;
+  const checkIn = params.get('checkIn') ?? todayLocalIso();
+  const checkOut = params.get('checkOut') ?? addDays(checkIn, 2);
+  const nights = nightsBetween(checkIn, checkOut);
+  const nightlyTotal = nights * 750_000;
+
+  return {
+    checkIn,
+    checkOut,
+    nights,
+    guests: Number(params.get('guests') ?? 1),
+    currency: 'RUB',
+    minNightsApplied: 2,
+    maxNights: 14,
+    nightly: [],
+    groups: [{ priceMinor: 750_000, nights, source: 'base', ruleId: null, ruleName: null }],
+    nightlyTotalMinor: nightlyTotal,
+    cleaningFeeMinor: 150_000,
+    serviceFeeMinor: 0,
+    totalMinor: nightlyTotal + 150_000,
+  };
+}
+
+function demoHostCalendar(listingId: string, url: string): HostCalendarResponse {
+  const params = new URL(url, 'http://localhost').searchParams;
+  return {
+    listingId,
+    from: params.get('from') ?? todayLocalIso(),
+    to: params.get('to') ?? addDays(todayLocalIso(), 30),
+    today: todayLocalIso(),
+    bookings: [],
+    blocks: [],
+  };
+}
+
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -145,6 +205,9 @@ export type ApiMockOptions = {
   listings?: ListingDto[];
   catalogListings?: PublicListingSummary[];
   catalogDetail?: PublicListing | null;
+  priceRules?: PriceRuleDto[];
+  blocks?: BlockDto[];
+  pendingHostCalendar?: boolean;
   publishStatus?: number;
   publishBody?: unknown;
   onRequest?: (url: string, init?: RequestInit) => void;
@@ -197,11 +260,21 @@ function currentListing(store: ListingDto[], url: string): ListingDto {
   return store.find((listing) => listing.id === listingId(url)) ?? demoListing;
 }
 
+// eslint-disable-next-line complexity -- мини-API тестов маршрутизирует десяток эндпоинтов.
 function listingGetRoute({ url, method, options }: RouteContext): Response | null {
   if (method !== 'GET') return null;
   if (url.endsWith('/me/listings')) return null;
   if (url.includes('/cities')) return jsonResponse({ cities: ['Суздаль', 'Кострома'] });
   if (url.endsWith('/amenities')) return jsonResponse({ amenities: demoAmenities });
+  if (url.includes('/calendar/host')) {
+    return jsonResponse(demoHostCalendar(listingId(url), url));
+  }
+  if (url.includes('/calendar?')) return jsonResponse(demoCalendar(listingId(url)));
+  if (url.includes('/quote?')) return jsonResponse({ quote: demoQuote(url) });
+  if (url.includes('/price-rules')) {
+    return jsonResponse({ priceRules: options.priceRules ?? [] });
+  }
+  if (url.includes('/blocks')) return jsonResponse({ blocks: options.blocks ?? [] });
   if (url.includes('/listings?')) {
     return jsonResponse({
       listings: options.catalogListings ?? [demoPublicListing],
@@ -215,7 +288,46 @@ function listingGetRoute({ url, method, options }: RouteContext): Response | nul
   return null;
 }
 
-function listingPostRoute({ url, store, options }: RouteContext): Response | null {
+function priceRuleFrom(url: string, init: RequestInit | undefined): PriceRuleDto {
+  const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+  const ruleId = url.split('/price-rules/')[1] ?? 'rule-1';
+
+  return {
+    id: ruleId,
+    listingId: listingId(url),
+    name: String(body.name ?? 'Высокий сезон'),
+    dateFrom: String(body.dateFrom ?? addDays(todayLocalIso(), 10)),
+    dateTo: String(body.dateTo ?? addDays(todayLocalIso(), 20)),
+    nightlyPriceMinor: Number(body.nightlyPriceMinor ?? 900_000),
+    minNights:
+      body.minNights === undefined || body.minNights === null ? null : Number(body.minNights),
+    priority: Number(body.priority ?? 0),
+    createdAt: '2026-10-19T10:00:00.000Z',
+  };
+}
+
+function blockFrom(url: string, init: RequestInit | undefined): BlockDto {
+  const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+
+  return {
+    id: 'block-1',
+    listingId: listingId(url),
+    dateFrom: String(body.dateFrom ?? addDays(todayLocalIso(), 1)),
+    dateTo: String(body.dateTo ?? addDays(todayLocalIso(), 2)),
+    reason: typeof body.reason === 'string' ? body.reason : null,
+    createdAt: '2026-10-19T10:00:00.000Z',
+  };
+}
+
+function listingPostRoute({ url, init, store, options }: RouteContext): Response | null {
+  if (url.includes('/price-rules')) {
+    return jsonResponse({ priceRule: priceRuleFrom(url, init) }, 201);
+  }
+
+  if (url.includes('/blocks')) {
+    return jsonResponse({ block: blockFrom(url, init) }, 201);
+  }
+
   if (url.endsWith('/listings')) {
     const listing = { ...demoListing, id: `listing-${store.length + 1}` };
     store.unshift(listing);
@@ -250,6 +362,9 @@ function listingsRoute(ctx: RouteContext): Response | null {
   if (ctx.method === 'GET') return listingGetRoute(ctx);
   if (ctx.method === 'POST') return listingPostRoute(ctx);
   if (ctx.method === 'PUT') return jsonResponse({ listing: ctx.store[0] ?? demoListing });
+  if (ctx.method === 'PATCH' && ctx.url.includes('/price-rules/')) {
+    return jsonResponse({ priceRule: priceRuleFrom(ctx.url, ctx.init) });
+  }
   if (ctx.method === 'PATCH') return listingPatchRoute(ctx);
   if (ctx.method === 'DELETE') return new Response(null, { status: 204 });
 
@@ -275,6 +390,9 @@ export function mockApi(options: ApiMockOptions = {}): ReturnType<typeof vi.fn> 
   const store = [...(options.listings ?? [])];
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     options.onRequest?.(String(input), init);
+    if (options.pendingHostCalendar && String(input).includes('/calendar/host')) {
+      return new Promise<Response>(() => undefined);
+    }
     const method = (init?.method ?? 'GET').toUpperCase();
     return Promise.resolve(route({ url: String(input), method, init, store, options }));
   });
