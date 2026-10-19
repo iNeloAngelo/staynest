@@ -90,6 +90,11 @@ function money(raw: string): number | null {
   return value !== null && value > 0 && value <= MAX_MONEY_MINOR ? value : null;
 }
 
+function fee(raw: string): number | null {
+  const value = inputToMinor(raw);
+  return value !== null && value >= 0 && value <= MAX_MONEY_MINOR ? value : null;
+}
+
 function issue(field: keyof ListingFormState, code: string): ListingFormIssue {
   return { field, code };
 }
@@ -119,7 +124,7 @@ function numericIssues(state: ListingFormState): ListingFormIssue[] {
     ['areaSqm', 'invalid_area', isInvalid(state.areaSqm, nullableInteger(state.areaSqm, 1, 2000))],
     ['basePrice', 'invalid_price', isInvalid(state.basePrice, money(state.basePrice))],
     ['weekendPrice', 'invalid_price', isInvalid(state.weekendPrice, money(state.weekendPrice))],
-    ['cleaningFee', 'invalid_price', isInvalid(state.cleaningFee, inputToMinor(state.cleaningFee))],
+    ['cleaningFee', 'invalid_price', isInvalid(state.cleaningFee, fee(state.cleaningFee))],
     [
       'minNights',
       'invalid_nights',
@@ -169,7 +174,7 @@ export function toUpdateInput(state: ListingFormState): {
     areaSqm: nullableInteger(state.areaSqm, 1, 2000),
     basePriceMinor: money(state.basePrice),
     weekendPriceMinor: money(state.weekendPrice),
-    cleaningFeeMinor: inputToMinor(state.cleaningFee) ?? 0,
+    cleaningFeeMinor: fee(state.cleaningFee) ?? 0,
     minNights: boundedInteger(state.minNights, 1, 365, 1),
     maxNights: boundedInteger(state.maxNights, 1, 365, 30),
     checkInTime: state.checkInTime,

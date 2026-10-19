@@ -15,6 +15,6 @@ describe('money helpers', () => {
   });
 
   it('не роняет экран из-за неизвестной валюты в старых данных', () => {
-    expect(formatMoney(650_000, 'ru', '123')).toContain('6');
+    expect(formatMoney(650_000, 'ru', '123')).toMatch(/6[\s\u00A0]500/);
   });
 });

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ModeSwitch } from '../../../shared/ui/ModeSwitch';
 import { useMode } from '../model/ModeProvider';
 import type { AppMode } from '../model/ModeProvider';
@@ -11,6 +12,15 @@ export type ModeSwitchControlProps = {
 export function ModeSwitchControl({ fullWidth = false, className }: ModeSwitchControlProps) {
   const { t } = useTranslation();
   const { mode, setMode } = useMode();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  function onChange(value: AppMode): void {
+    setMode(value);
+    // На host-маршруте гостевая навигация недоступна: уводим на главную,
+    // иначе переключатель выглядит сломанным.
+    if (value === 'guest' && location.pathname.startsWith('/host')) navigate('/');
+  }
 
   return (
     <ModeSwitch
@@ -20,7 +30,7 @@ export function ModeSwitchControl({ fullWidth = false, className }: ModeSwitchCo
         { value: 'guest', label: t('mode.guest') },
         { value: 'host', label: t('mode.host') },
       ]}
-      onChange={(value) => setMode(value as AppMode)}
+      onChange={(value) => onChange(value as AppMode)}
       fullWidth={fullWidth}
       className={className}
     />

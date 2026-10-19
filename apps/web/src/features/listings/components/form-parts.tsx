@@ -25,6 +25,8 @@ export function NumberField({
   onChange,
   min = 0,
   max,
+  step = 1,
+  inputMode = 'numeric',
 }: {
   id?: string;
   label: string;
@@ -33,15 +35,17 @@ export function NumberField({
   onChange: (value: string) => void;
   min?: number;
   max?: number;
+  step?: number | string;
+  inputMode?: 'numeric' | 'decimal';
 }) {
   return (
     <Input
       {...(id ? { id } : {})}
       type="number"
-      inputMode="numeric"
+      inputMode={inputMode}
       min={min}
       {...(max !== undefined ? { max } : {})}
-      step={1}
+      step={step}
       label={label}
       error={error}
       value={value}

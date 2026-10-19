@@ -21,6 +21,8 @@ export function ListingPriceSection({ state, setField, errors }: SectionProps) {
           error={errors.basePrice}
           onChange={(value) => setField('basePrice', value)}
           min={1}
+          step="0.01"
+          inputMode="decimal"
         />
         <NumberField
           label={t('listings.field.weekendPrice')}
@@ -28,6 +30,8 @@ export function ListingPriceSection({ state, setField, errors }: SectionProps) {
           error={errors.weekendPrice}
           onChange={(value) => setField('weekendPrice', value)}
           min={1}
+          step="0.01"
+          inputMode="decimal"
         />
         <NumberField
           label={t('listings.field.cleaningFee')}
@@ -35,6 +39,8 @@ export function ListingPriceSection({ state, setField, errors }: SectionProps) {
           error={errors.cleaningFee}
           onChange={(value) => setField('cleaningFee', value)}
           min={0}
+          step="0.01"
+          inputMode="decimal"
         />
       </div>
 

@@ -100,10 +100,20 @@ async function publishFully(h: Harness, host: TestUser): Promise<string> {
   return id;
 }
 
+function daysFromNow(days: number): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function bookingRange(startDays: number, endDays: number): string {
+  return `[${daysFromNow(startDays)},${daysFromNow(endDays)})`;
+}
+
 async function insertBooking(
   h: Harness,
   listingId: string,
-  range = '[2027-01-10,2027-01-12)',
+  range = bookingRange(30, 32),
   status: 'pending' | 'confirmed' | 'declined' = 'pending',
 ): Promise<string> {
   const guest = await usersService.create(h.db.kysely, {
@@ -471,6 +481,11 @@ describeDatabase('listings API', () => {
     ).toContain('photos');
 
     await addPhotos(h, id, 1);
+    let publishedEvents = 0;
+    h.events.subscribe('listing.published', () => {
+      publishedEvents += 1;
+    });
+
     const [first, second] = await Promise.all([
       h.app.inject({
         method: 'POST',
@@ -485,12 +500,13 @@ describeDatabase('listings API', () => {
     ]);
 
     expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+    expect(publishedEvents).toBe(1);
   });
 
   it('архивирует при подтверждённой брони только после её завершения', async () => {
     const { h, host } = await setup();
     const id = await publishFully(h, host);
-    await insertBooking(h, id, '[2027-01-10,2027-01-12)', 'confirmed');
+    await insertBooking(h, id, bookingRange(30, 32), 'confirmed');
 
     const blocked = await h.app.inject({
       method: 'POST',
@@ -516,7 +532,7 @@ describeDatabase('listings API', () => {
   it('прошлая бронь не мешает архивированию', async () => {
     const { h, host } = await setup();
     const id = await publishFully(h, host);
-    await insertBooking(h, id, '[2020-01-10,2020-01-12)', 'pending');
+    await insertBooking(h, id, bookingRange(-10, -8), 'pending');
 
     const response = await h.app.inject({
       method: 'POST',
