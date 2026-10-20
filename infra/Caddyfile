@@ -45,22 +45,20 @@
 		reverse_proxy api:3100
 	}
 
-	handle /media/listings/* {
+	handle_path /media/listings/* {
 		@notAllowed not method GET HEAD
 		respond @notAllowed 405
 		# Бакет публичный только на listings/* (политику ставит API).
-		uri strip_prefix /media
 		rewrite * /{$S3_BUCKET:staynest-media}{path}
 		reverse_proxy silo:9000
 		header Cache-Control "public, max-age=31536000, immutable"
 		header X-Content-Type-Options "nosniff"
 	}
 
-	handle /media/avatars/* {
+	handle_path /media/avatars/* {
 		@notAllowed not method GET HEAD
 		respond @notAllowed 405
 		# Публичная раздача только квадратных WebP-аватаров (политику ставит API).
-		uri strip_prefix /media
 		rewrite * /{$S3_BUCKET:staynest-media}{path}
 		reverse_proxy silo:9000
 		header Cache-Control "public, max-age=31536000, immutable"
