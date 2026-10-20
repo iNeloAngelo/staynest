@@ -66,6 +66,9 @@ fi
 echo "== build =="
 "${COMPOSE[@]}" build
 
+echo "== stop stack (network changes need clean recreate) =="
+"${COMPOSE[@]}" down --remove-orphans
+
 echo "== postgres =="
 "${COMPOSE[@]}" up -d postgres
 PG_ID="$("${COMPOSE[@]}" ps -q postgres)"
