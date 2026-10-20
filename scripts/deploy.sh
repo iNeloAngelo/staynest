@@ -26,6 +26,18 @@ if grep -qE '^JWT_SECRET=$|^JWT_SECRET=dev-only-' .env; then
   exit 1
 fi
 
+# Мок-провайдеру нужен секрет подписи вебхука, но реального провайдера нет:
+# генерируем заглушку один раз, чтобы API не падал at startup (fail-closed).
+if ! grep -qE '^PAYMENT_WEBHOOK_SECRET=.{32,}' .env; then
+  if grep -qE '^PAYMENT_MOCK_ENABLED=false' .env; then
+    echo "PAYMENT_WEBHOOK_SECRET не задан, а PAYMENT_MOCK_ENABLED=false." >&2
+    exit 1
+  fi
+  sed -i '/^PAYMENT_WEBHOOK_SECRET=[[:space:]]*$/d' .env
+  printf '\nPAYMENT_WEBHOOK_SECRET=%s\n' "$(openssl rand -base64 48)" >> .env
+  echo "PAYMENT_WEBHOOK_SECRET: сгенерирован секрет мок-провайдера (реальные ключи не нужны)."
+fi
+
 if grep -qE '^(CORS_ORIGINS|APP_WEB_URL)=.*(localhost|127\.0\.0\.1)' .env; then
   echo "CORS_ORIGINS и APP_WEB_URL в production не должны содержать localhost." >&2
   exit 1
