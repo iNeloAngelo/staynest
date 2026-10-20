@@ -55,6 +55,43 @@ jobs:
       - run: pnpm db:migrate:down --test
       - run: pnpm build
 
+  e2e:
+    name: Playwright booking flow
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: staynest
+          POSTGRES_PASSWORD: staynest
+          POSTGRES_DB: staynest_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U staynest -d staynest_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      E2E_DATABASE_URL: postgres://staynest:staynest@localhost:5432/staynest_test
+      CI: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
   security:
     name: Secrets and dependencies
     runs-on: ubuntu-latest
