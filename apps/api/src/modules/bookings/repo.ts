@@ -11,8 +11,11 @@ export type BookingDetailRow = BookingRow & {
   listing_owner_id: string;
   listing_title: string;
   listing_city: string | null;
+  listing_address_line: string | null;
   cover_storage_prefix: string | null;
   guest_display_name: string;
+  guest_phone: string | null;
+  host_phone: string | null;
   created_at_precise: string;
 };
 
@@ -33,8 +36,11 @@ function detailSelection() {
     'listings.owner_id as listing_owner_id',
     'listings.title as listing_title',
     'listings.city as listing_city',
+    'listings.address_line as listing_address_line',
     'listing_photos.storage_prefix as cover_storage_prefix',
     'users.display_name as guest_display_name',
+    'users.phone as guest_phone',
+    'host_users.phone as host_phone',
     createdAtPrecise().as('created_at_precise'),
   ] as const;
 }
@@ -44,6 +50,7 @@ function detailQuery(executor: DbExecutor) {
     .selectFrom('bookings')
     .innerJoin('listings', 'listings.id', 'bookings.listing_id')
     .innerJoin('users', 'users.id', 'bookings.guest_id')
+    .innerJoin('users as host_users', 'host_users.id', 'listings.owner_id')
     .leftJoin('listing_photos', 'listing_photos.id', 'listings.cover_photo_id');
 }
 
@@ -118,6 +125,7 @@ function actorCondition(executor: DbExecutor, userId: string) {
     .selectFrom('bookings')
     .innerJoin('listings', 'listings.id', 'bookings.listing_id')
     .innerJoin('users', 'users.id', 'bookings.guest_id')
+    .innerJoin('users as host_users', 'host_users.id', 'listings.owner_id')
     .leftJoin('listing_photos', 'listing_photos.id', 'listings.cover_photo_id')
     .where((eb) =>
       eb.or([eb('bookings.guest_id', '=', userId), eb('listings.owner_id', '=', userId)]),

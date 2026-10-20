@@ -81,6 +81,43 @@ describeDatabase('статусы брони', () => {
     expect(booking.events.at(-1)).toMatchObject({ actorRole: 'host', note: null });
   });
 
+  it('открывает адрес и телефон второй стороны только после подтверждения', async () => {
+    const { id } = await setupPending(h, host, guest);
+    await client.query('UPDATE users SET phone = $1 WHERE id = $2', ['+7 900 000-00-11', guest.id]);
+    await client.query('UPDATE users SET phone = $1 WHERE id = $2', ['+7 900 000-00-22', host.id]);
+
+    const pending = await h.app.inject({
+      method: 'GET',
+      url: `/api/v1/bookings/${id}`,
+      headers: authHeaders(guest.cookie),
+    });
+    expect((pending.json() as BookingResponse).booking.contacts).toBeNull();
+
+    await action(h, host, id, { name: 'confirm' });
+
+    const guestView = await h.app.inject({
+      method: 'GET',
+      url: `/api/v1/bookings/${id}`,
+      headers: authHeaders(guest.cookie),
+    });
+    const hostView = await h.app.inject({
+      method: 'GET',
+      url: `/api/v1/bookings/${id}`,
+      headers: authHeaders(host.cookie),
+    });
+
+    expect((guestView.json() as BookingResponse).booking.contacts).toEqual({
+      addressLine: 'Лесная улица, 12',
+      hostPhone: '+7 900 000-00-22',
+      guestPhone: null,
+    });
+    expect((hostView.json() as BookingResponse).booking.contacts).toEqual({
+      addressLine: 'Лесная улица, 12',
+      hostPhone: null,
+      guestPhone: '+7 900 000-00-11',
+    });
+  });
+
   it('гость не может подтвердить или отклонить заявку', async () => {
     const { id } = await setupPending(h, host, guest);
 

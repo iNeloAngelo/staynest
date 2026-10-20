@@ -1,4 +1,10 @@
-import type { BookingDetail, BookingEvent, BookingSummary, Quote } from '@staynest/shared';
+import type {
+  BookingContacts,
+  BookingDetail,
+  BookingEvent,
+  BookingSummary,
+  Quote,
+} from '@staynest/shared';
 import type { BookingDetailRow, BookingEventRow } from './repo';
 
 function iso(value: Date): string {
@@ -74,6 +80,23 @@ function eventOf(row: BookingEventRow, guestId: string, hostId: string): Booking
   };
 }
 
+/**
+ * Адрес и телефон второй стороны открываются только после подтверждения.
+ * До этого гость и хозяин видят только город, а завершённая бронь остаётся
+ * полезной для истории поездок.
+ */
+function contactsOf(row: BookingDetailRow, viewerId: string): BookingContacts | null {
+  if (row.status !== 'confirmed' && row.status !== 'completed') return null;
+
+  const viewerIsGuest = viewerId === row.guest_id;
+
+  return {
+    addressLine: row.listing_address_line,
+    hostPhone: viewerIsGuest ? row.host_phone : null,
+    guestPhone: viewerIsGuest ? null : row.guest_phone,
+  };
+}
+
 export function toBookingSummary(row: BookingDetailRow, publicPath: string): BookingSummary {
   return summaryOf(row, publicPath);
 }
@@ -82,9 +105,11 @@ export function toBookingDetail(
   row: BookingDetailRow,
   events: BookingEventRow[],
   publicPath: string,
+  viewerId: string,
 ): BookingDetail {
   return {
     ...summaryOf(row, publicPath),
     events: events.map((event) => eventOf(event, row.guest_id, row.listing_owner_id)),
+    contacts: contactsOf(row, viewerId),
   };
 }

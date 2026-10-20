@@ -182,6 +182,7 @@ async function applyOnLockedRow(context: ApplyContext): Promise<TransitionOutcom
         updated,
         await listBookingEvents(trx, bookingId),
         runtime.config.storage.publicPath,
+        actorId,
       ),
     },
     payload: {

@@ -124,13 +124,14 @@ async function insertPendingBooking(
 async function createdResponse(
   trx: DbExecutor,
   bookingId: string,
+  guestId: string,
   publicPath: string,
 ): Promise<BookingResponse> {
   const row = await findBookingById(trx, bookingId);
   if (!row) throw new Error('Созданная бронь не найдена');
 
   return {
-    booking: toBookingDetail(row, await listBookingEvents(trx, bookingId), publicPath),
+    booking: toBookingDetail(row, await listBookingEvents(trx, bookingId), publicPath, guestId),
   };
 }
 
@@ -176,7 +177,7 @@ async function createInTransaction(
     note: null,
   });
 
-  const body = await createdResponse(trx, inserted.id, runtime.config.storage.publicPath);
+  const body = await createdResponse(trx, inserted.id, guestId, runtime.config.storage.publicPath);
   await saveIdempotentResponse(trx, { userId: guestId, key, requestHash, status: 201, body });
 
   return {

@@ -146,8 +146,17 @@ export const bookingEventSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+export const bookingContactsSchema = z.object({
+  /** Точный адрес дома: виден участникам только после подтверждения. */
+  addressLine: z.string().nullable(),
+  /** Телефон второй стороны: гостю — хозяина, хозяину — гостя. */
+  hostPhone: z.string().nullable(),
+  guestPhone: z.string().nullable(),
+});
+
 export const bookingDetailSchema = bookingSummarySchema.extend({
   events: z.array(bookingEventSchema),
+  contacts: bookingContactsSchema.nullable(),
 });
 
 export const bookingResponseSchema = z.object({ booking: bookingDetailSchema });
@@ -165,6 +174,7 @@ export type BookingListingSummary = z.infer<typeof bookingListingSummarySchema>;
 export type BookingGuestSummary = z.infer<typeof bookingGuestSummarySchema>;
 export type BookingSummary = z.infer<typeof bookingSummarySchema>;
 export type BookingEvent = z.infer<typeof bookingEventSchema>;
+export type BookingContacts = z.infer<typeof bookingContactsSchema>;
 export type BookingDetail = z.infer<typeof bookingDetailSchema>;
 export type BookingResponse = z.infer<typeof bookingResponseSchema>;
 export type BookingsResponse = z.infer<typeof bookingsResponseSchema>;

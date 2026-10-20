@@ -39,6 +39,6 @@ export async function getBooking(
       if (!row) throw bookingNotFound();
 
       const events = await listBookingEvents(trx, bookingId);
-      return toBookingDetail(row, events, runtime.config.storage.publicPath);
+      return toBookingDetail(row, events, runtime.config.storage.publicPath, userId);
     });
 }
