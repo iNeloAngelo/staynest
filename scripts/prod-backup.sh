@@ -40,7 +40,7 @@ if [[ -z "$PG_CONTAINER" ]]; then
   exit 1
 fi
 
-install -d -m 700 "$DAY_DIR" "$WEEK_DIR"
+install -d -m 700 "$BACKUP_DIR" "$DAY_DIR" "$WEEK_DIR"
 umask 077
 
 # Не даём двум запускам пересечься (долгий restore-check).
@@ -64,9 +64,11 @@ trap cleanup EXIT
 echo "[$(date -u +%FT%TZ)] dump $PGDB"
 docker exec "$PG_CONTAINER" pg_dump -U "$PGUSER" -d "$PGDB" --format=custom --compress=6 -f "$PG_TMP"
 docker cp "$PG_CONTAINER:$PG_TMP" "$DUMP_PATH"
+chmod 600 "$DUMP_PATH"
 
 echo "[$(date -u +%FT%TZ)] globals (роли и настройки)"
 docker exec "$PG_CONTAINER" pg_dumpall -U "$PGUSER" --globals-only > "$DAY_DIR/$GLOBALS_NAME"
+chmod 600 "$DAY_DIR/$GLOBALS_NAME"
 
 echo "[$(date -u +%FT%TZ)] verify dump"
 docker cp "$DUMP_PATH" "$PG_CONTAINER:$PG_TMP"
@@ -99,8 +101,9 @@ if [[ -n "$SILO_CONTAINER" ]]; then
     docker run --rm \
       -v "$SILO_VOLUME:/data:ro" \
       -v "$DAY_DIR:/backup" \
-      "$PG_IMAGE" tar czf "/backup/staynest-silo-$STAMP.tar.gz" -C /data .
+      "$PG_IMAGE" sh -c "tar czf '/backup/staynest-silo-$STAMP.tar.gz' -C /data . && chown $(id -u):$(id -g) '/backup/staynest-silo-$STAMP.tar.gz' && chmod 600 '/backup/staynest-silo-$STAMP.tar.gz'"
     sha256sum "$DAY_DIR/staynest-silo-$STAMP.tar.gz" > "$DAY_DIR/staynest-silo-$STAMP.tar.gz.sha256"
+    chmod 600 "$DAY_DIR/staynest-silo-$STAMP.tar.gz.sha256"
   else
     echo "Не найден том /data контейнера silo, пропускаю бэкап бакета" >&2
   fi
@@ -110,6 +113,7 @@ fi
 
 echo "[$(date -u +%FT%TZ)] checksums"
 sha256sum "$DUMP_PATH" > "$DUMP_PATH.sha256"
+chmod 600 "$DUMP_PATH.sha256"
 
 # Недельная копия по воскресеньям (UTC).
 if [[ "$(date -u +%u)" == "7" ]]; then
