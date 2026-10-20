@@ -2,6 +2,8 @@
 
 Модуль — независимая область: `auth`, `users`, `listings`, `photos`, `pricing`,
 `availability`, `catalog`, `bookings`, `notifications`, `favorites`, `dashboard`, `health`.
+Депозиты и мок-провайдер живут внутри `bookings` (`payments/`): платёж — часть
+агрегата брони, а отдельный модуль дал бы цикл `bookings ↔ payments`.
 
 ## Шаблон модуля
 

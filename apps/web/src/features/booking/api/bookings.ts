@@ -6,6 +6,7 @@ import type {
   CancelBookingInput,
   CreateBookingInput,
   DeclineBookingInput,
+  DepositPaymentResponse,
 } from '@staynest/shared';
 import { api } from '../../../shared/api';
 
@@ -52,6 +53,11 @@ export async function cancelBookingRequest(
 ): Promise<BookingDetail> {
   const response = await api.post<BookingResponse>(`/bookings/${id}/cancel`, input);
   return response.booking;
+}
+
+/** Открывает сессию мок-провайдера; повторный вызов возвращает ту же ссылку. */
+export function startDepositRequest(id: string): Promise<DepositPaymentResponse> {
+  return api.post<DepositPaymentResponse>(`/bookings/${id}/deposit`);
 }
 
 /** Ключ должен быть стабильным для одинакового тела и меняться при правках формы. */

@@ -29,6 +29,7 @@
 | `booking.cancelled` | второй стороне (по `actorId`) | да |
 | `booking.expiring_soon` | хозяину, один раз на бронь | да |
 | `booking.expired` | гостю | нет |
+| `booking.deposit_expired` | гостю и хозяину | да |
 | `booking.completed` | гостю | нет |
 
 `payload` уведомления семантический (`bookingId`, `listingId`, `listingTitle`,

@@ -137,6 +137,21 @@ function expired(payload: NotificationPayload, locale: Locale): Text {
   };
 }
 
+function depositExpired(payload: NotificationPayload, locale: Locale): Text {
+  const range = formatRange(payload, locale);
+  if (locale === 'en') {
+    return {
+      title: 'Deposit not paid',
+      body: `The booking for “${payload.listingTitle}” (${range}) was cancelled: the deposit was not paid on time.`,
+    };
+  }
+
+  return {
+    title: 'Депозит не оплачен',
+    body: `Бронь «${payload.listingTitle}» (${range}) отменена: депозит не оплачен в срок.`,
+  };
+}
+
 function completed(payload: NotificationPayload, locale: Locale): Text {
   if (locale === 'en') {
     return {
@@ -177,6 +192,9 @@ export function pushMessage(
       break;
     case 'booking_expired':
       text = expired(payload, locale);
+      break;
+    case 'booking_deposit_expired':
+      text = depositExpired(payload, locale);
       break;
     case 'booking_completed':
       text = completed(payload, locale);

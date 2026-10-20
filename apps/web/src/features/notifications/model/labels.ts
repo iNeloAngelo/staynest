@@ -30,6 +30,11 @@ export const NOTIFICATION_META: Record<
     icon: Clock,
     tone: 'muted',
   },
+  booking_deposit_expired: {
+    titleKey: 'notifications.item.depositExpiredTitle',
+    icon: Clock,
+    tone: 'danger',
+  },
   booking_expiring_soon: {
     titleKey: 'notifications.item.expiringSoonTitle',
     icon: Clock,
@@ -62,6 +67,8 @@ export function notificationDescription(
         : t('notifications.item.cancelledByHost', { ...params, defaultValue: '' });
     case 'booking_expired':
       return t('notifications.item.expired', { ...params, defaultValue: '' });
+    case 'booking_deposit_expired':
+      return t('notifications.item.depositExpired', { ...params, defaultValue: '' });
     case 'booking_expiring_soon':
       return t('notifications.item.expiringSoon', { ...params, defaultValue: '' });
     case 'booking_completed':

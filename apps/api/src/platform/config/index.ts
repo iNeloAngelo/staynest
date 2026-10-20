@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { z } from 'zod';
+import { paymentsConfig } from './payments';
+import type { PaymentsConfig } from './payments';
 
 const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
 
@@ -77,6 +79,15 @@ const envSchema = z.object({
   BOOKING_MAX_ACTIVE_PENDING: z.coerce.number().int().min(1).max(50).default(5),
   BOOKING_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000).default(10),
   BOOKING_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(1_440).default(10),
+
+  /** Депозит мок-провайдера: процент от суммы брони и срок оплаты. */
+  PAYMENT_MOCK_ENABLED: z.enum(['true', 'false']).default('true'),
+  PAYMENT_DEPOSIT_PERCENT: z.coerce.number().int().min(0).max(100).default(20),
+  PAYMENT_DEPOSIT_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(48),
+  PAYMENT_WEBHOOK_SECRET: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().min(32).optional(),
+  ),
 
   /** Web Push: VAPID-пара генерируется `pnpm vapid:generate` и живёт только в .env. */
   VAPID_PUBLIC_KEY: z.string().trim().optional(),
@@ -160,6 +171,7 @@ export type AppConfig = {
   mail: MailConfig;
   storage: StorageConfig;
   booking: BookingConfig;
+  payments: PaymentsConfig;
   push: PushConfig;
 };
 
@@ -211,6 +223,36 @@ function pushConfig(data: EnvData): PushConfig {
 
 type EnvData = z.infer<typeof envSchema>;
 
+function assertNoDevSecret(value: string | undefined, name: string): void {
+  if (value?.trim().startsWith('dev-only-')) {
+    throw new Error(`${name} не должен совпадать с dev-значением: задайте случайный секрет.`);
+  }
+}
+
+function assertProductionOrigins(data: EnvData): void {
+  const origins = data.CORS_ORIGINS.split(',').map((origin) => origin.trim());
+  if (origins.some((origin) => /localhost|127\.0\.0\.1/.test(origin))) {
+    throw new Error('CORS_ORIGINS в production не должен содержать localhost.');
+  }
+  if (/localhost|127\.0\.0\.1/.test(data.APP_WEB_URL)) {
+    throw new Error('APP_WEB_URL в production не должен содержать localhost.');
+  }
+}
+
+function assertPaymentSecret(env: NodeJS.ProcessEnv, data: EnvData): void {
+  requireInProduction(env, ['PAYMENT_WEBHOOK_SECRET']);
+  assertNoDevSecret(data.PAYMENT_WEBHOOK_SECRET, 'PAYMENT_WEBHOOK_SECRET');
+}
+
+function assertStorageSecret(env: NodeJS.ProcessEnv, data: EnvData): void {
+  const secretKey = data.S3_SECRET_KEY?.trim() || env.MINIO_ROOT_PASSWORD?.trim();
+  if (!secretKey || secretKey === 'staynest-minio') {
+    throw new Error(
+      'В production задайте S3_SECRET_KEY (или MINIO_ROOT_PASSWORD), не dev-значение.',
+    );
+  }
+}
+
 function assertProductionConfig(env: NodeJS.ProcessEnv, data: EnvData): void {
   if (data.NODE_ENV !== 'production') return;
 
@@ -224,27 +266,13 @@ function assertProductionConfig(env: NodeJS.ProcessEnv, data: EnvData): void {
     'S3_BUCKET',
   ]);
 
-  if (data.JWT_SECRET?.trim().startsWith('dev-only-')) {
-    throw new Error('JWT_SECRET не должен совпадать с dev-значением: задайте случайный секрет.');
-  }
-
-  const origins = data.CORS_ORIGINS.split(',').map((origin) => origin.trim());
-  if (origins.some((origin) => /localhost|127\.0\.0\.1/.test(origin))) {
-    throw new Error('CORS_ORIGINS в production не должен содержать localhost.');
-  }
-  if (/localhost|127\.0\.0\.1/.test(data.APP_WEB_URL)) {
-    throw new Error('APP_WEB_URL в production не должен содержать localhost.');
-  }
+  assertNoDevSecret(data.JWT_SECRET, 'JWT_SECRET');
+  assertProductionOrigins(data);
   if (data.REQUIRE_EMAIL_VERIFICATION !== 'true') {
     throw new Error('В production REQUIRE_EMAIL_VERIFICATION должен быть true.');
   }
-
-  const secretKey = data.S3_SECRET_KEY?.trim() || env.MINIO_ROOT_PASSWORD?.trim();
-  if (!secretKey || secretKey === 'staynest-minio') {
-    throw new Error(
-      'В production задайте S3_SECRET_KEY (или MINIO_ROOT_PASSWORD), не dev-значение.',
-    );
-  }
+  assertPaymentSecret(env, data);
+  assertStorageSecret(env, data);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -312,6 +340,7 @@ function appConfigFrom(data: EnvData, env: NodeJS.ProcessEnv): AppConfig {
       maxPixels: data.PHOTO_MAX_PIXELS,
     },
     booking: bookingConfig(data),
+    payments: paymentsConfig(data),
     push: pushConfig(data),
   };
 }

@@ -20,6 +20,7 @@ PostgreSQL 16. Источник правды: SQL-миграции в `db/migrat
 | `0008_catalog_search_indexes` | функциональные индексы по `lower(city)` под поиск и сортировку каталога |
 | `0009_booking_engine` | конечные границы `daterange`, индекс pending-заявок гостя, строгий порядок `booking_events` по `id` |
 | `0010_notifications_dedupe` | `notifications.dedupe_key` и частичный уникальный индекс для напоминаний об истечении заявки |
+| `0011_deposit_payments` | `bookings.deposit_due_at`, индекс просроченных депозитов, `updated_at`-триггер и индекс депозитов `payments` |
 
 ```bash
 pnpm db:reset        # пересоздать базу разработки: drop schema, миграции, сид
@@ -421,6 +422,7 @@ CREATE TABLE listing_blocks (
 | guest_message | text | NULL |
 | host_response | text | NULL |
 | expires_at | timestamptz | NULL, для pending: срок ответа хозяина |
+| deposit_due_at | timestamptz | NULL, для confirmed: срок оплаты депозита (миграция 0011) |
 | confirmed_at | timestamptz | NULL |
 | cancelled_at | timestamptz | NULL |
 | cancelled_by | uuid | NULL, FK users(id) |
@@ -445,6 +447,7 @@ CREATE TABLE bookings (
   host_response   text,
   expires_at      timestamptz,
   confirmed_at    timestamptz,
+  deposit_due_at  timestamptz,
   cancelled_at    timestamptz,
   cancelled_by    uuid REFERENCES users(id),
   cancel_reason   text,
@@ -469,6 +472,8 @@ CREATE INDEX bookings_guest_idx         ON bookings (guest_id, created_at DESC);
 CREATE INDEX bookings_guest_pending_idx ON bookings (guest_id) WHERE status = 'pending';
 CREATE INDEX bookings_listing_status_idx ON bookings (listing_id, status, check_in);
 CREATE INDEX bookings_pending_expiry_idx ON bookings (expires_at) WHERE status = 'pending';
+CREATE INDEX bookings_deposit_due_idx   ON bookings (deposit_due_at)
+  WHERE status = 'confirmed' AND deposit_due_at IS NOT NULL;
 CREATE INDEX bookings_completion_idx     ON bookings (check_out) WHERE status = 'confirmed';
 ```
 
@@ -575,6 +580,7 @@ CREATE INDEX push_subscriptions_user_idx ON push_subscriptions (user_id);
 
 ## 16. payments — платёжная заглушка (Сессия 18, опционально)
 
+Владелец таблицы — модуль `bookings` (депозит — часть агрегата брони).
 Никаких данных карт. Хранится только результат от провайдера и ссылка на его объект.
 
 ```sql
@@ -593,7 +599,18 @@ CREATE TABLE payments (
 );
 CREATE UNIQUE INDEX payments_provider_external_uq ON payments (provider, external_id) WHERE external_id IS NOT NULL;
 CREATE INDEX payments_booking_idx ON payments (booking_id);
+-- Миграция 0011:
+CREATE TRIGGER payments_set_updated_at BEFORE UPDATE ON payments
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX payments_booking_deposit_idx
+  ON payments (booking_id, created_at DESC)
+  WHERE kind = 'deposit';
 ```
+
+`external_id` — opaque-токен сессии мок-провайдера, уникальный в паре с
+`provider`. `raw_event` хранит только проверенное событие провайдера (без
+карточных полей: strict-схема их отвергает). `status='refunded'` ставится
+депозиту при отмене оплаченной брони.
 
 ## 17. reviews — отзывы (v2, не в MVP)
 

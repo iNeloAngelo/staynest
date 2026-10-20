@@ -41,6 +41,12 @@ const config: AppConfig = {
     maxActivePending: 5,
     rateLimit: { max: 1_000, windowMs: 60_000 },
   },
+  payments: {
+    mockEnabled: true,
+    depositPercent: 20,
+    depositTtlHours: 48,
+    webhookSecret: 'test-payment-webhook-secret-with-32-chars',
+  },
   push: {
     enabled: false,
     publicKey: null,

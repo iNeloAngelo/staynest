@@ -3,6 +3,8 @@ import type { BookingRuntime } from './context';
 import { decodeBookingCursor, encodeBookingCursor } from './cursor';
 import { bookingNotFound } from './errors';
 import { toBookingDetail, toBookingSummary } from './mapping';
+import { depositOf } from './payments/mapping';
+import { listDeposits } from './payments/repo';
 import { findBookingForActor, listBookingEvents, listBookingsForUser } from './repo';
 
 export async function listBookings(
@@ -39,6 +41,11 @@ export async function getBooking(
       if (!row) throw bookingNotFound();
 
       const events = await listBookingEvents(trx, bookingId);
-      return toBookingDetail(row, events, runtime.config.storage.publicPath, userId);
+      const deposits = await listDeposits(trx, bookingId);
+      return toBookingDetail(row, events, {
+        publicPath: runtime.config.storage.publicPath,
+        viewerId: userId,
+        deposit: depositOf(row.deposit_due_at, deposits),
+      });
     });
 }

@@ -16,7 +16,7 @@
 | Цены | `pricing` | `price-editor` | `listing_price_rules` |
 | Доступность и календарь | `availability` | `calendar` | `listing_blocks` |
 | **Главная и каталог** | `catalog` (только чтение) | `catalog`, `filters` | читает `listings`, `bookings` |
-| Бронирование | `bookings` | `booking`, `trips`, `host-requests` | `bookings`, `booking_events`, `idempotency_keys` |
+| Бронирование | `bookings` (включая депозиты) | `booking`, `trips`, `host-requests` | `bookings`, `booking_events`, `idempotency_keys`, `payments` |
 | Уведомления | `notifications` | `notifications` | `notifications`, `push_subscriptions` |
 | Избранное | `favorites` | `favorites` | `favorites` |
 | Панель хозяина | `dashboard` (только чтение) | `host-dashboard` | читает `bookings`, `listings` |
@@ -110,6 +110,7 @@ apps/web/src/
 | `booking.confirmed` / `booking.declined` | `bookings` | `notifications` (гостю) |
 | `booking.cancelled` | `bookings` | `notifications` (второй стороне) |
 | `booking.expired` | `bookings` (джоб или истечение под блокировкой) | `notifications` (гостю) |
+| `booking.deposit_expired` | `bookings` (джоб депозита) | `notifications` (гостю и хозяину) |
 | `booking.expiring_soon` | `bookings` (джоб) | `notifications` (хозяину, дедупликация) |
 | `booking.completed` | `bookings` (джоб) | `notifications` (гостю), `dashboard` (при необходимости кэша) |
 | `listing.published` | `listings` | пока никто (задел) |

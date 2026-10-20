@@ -16,6 +16,11 @@ const ERROR_KEYS: Record<string, TranslationKey> = {
   idempotency_key_conflict: 'booking.errors.idempotencyConflict',
   network_error: 'booking.errors.network',
   unauthorized: 'booking.errors.unauthorized',
+  deposit_unavailable: 'booking.errors.depositUnavailable',
+  deposit_already_paid: 'booking.errors.depositAlreadyPaid',
+  deposit_expired: 'booking.errors.depositExpired',
+  payment_forbidden: 'booking.errors.paymentForbidden',
+  payment_not_found: 'booking.errors.paymentNotFound',
 };
 
 export function bookingErrorText(error: unknown, t: TFunction): string {

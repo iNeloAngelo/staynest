@@ -14,6 +14,7 @@ import {
   declineBookingRequest,
   fetchBooking,
   fetchBookings,
+  startDepositRequest,
 } from './bookings';
 
 export const bookingKeys = {
@@ -99,5 +100,12 @@ export function useCancelBooking() {
     onSuccess: (booking) => {
       invalidate(booking);
     },
+  });
+}
+
+/** Возвращает ссылку провайдера; страница брони переходит на неё целиком. */
+export function useStartDeposit() {
+  return useMutation({
+    mutationFn: (id: string) => startDepositRequest(id),
   });
 }

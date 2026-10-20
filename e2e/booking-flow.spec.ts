@@ -183,6 +183,17 @@ async function verifyGuestBooking(guestPage: Page, bookingUrl: string): Promise<
   await expect(guestPage.getByText('Подтверждено').first()).toBeVisible();
   await expect(guestPage.getByRole('heading', { name: 'Контакты' })).toBeVisible();
   await expect(guestPage.getByText('улица Лесная, 12')).toBeVisible();
+  await expect(guestPage.getByRole('heading', { name: 'Депозит' })).toBeVisible();
+
+  // Депозит: кнопка уводит на hosted-страницу мок-провайдера, оплата
+  // возвращает на бронь, где статус уже succeeded.
+  await guestPage.getByRole('button', { name: 'Оплатить депозит' }).click();
+  await expect(guestPage).toHaveURL(/\/api\/v1\/mock-payments\//);
+  await expect(guestPage.getByText(/демонстрационная страница/i)).toBeVisible();
+  await guestPage.getByRole('button', { name: 'Оплатить депозит' }).click();
+  await expect(guestPage.getByText('Депозит оплачен, бронь закреплена.')).toBeVisible();
+  await expect(guestPage.getByText(/Депозит оплачен/).first()).toBeVisible();
+
   await expectNoA11yViolations(guestPage);
 }
 

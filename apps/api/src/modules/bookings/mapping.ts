@@ -1,5 +1,6 @@
 import type {
   BookingContacts,
+  BookingDeposit,
   BookingDetail,
   BookingEvent,
   BookingSummary,
@@ -102,15 +103,21 @@ export function toBookingSummary(row: BookingDetailRow, publicPath: string): Boo
   return summaryOf(row, publicPath);
 }
 
+export type BookingDetailContext = {
+  publicPath: string;
+  viewerId: string;
+  deposit?: BookingDeposit | null;
+};
+
 export function toBookingDetail(
   row: BookingDetailRow,
   events: BookingEventRow[],
-  publicPath: string,
-  viewerId: string,
+  context: BookingDetailContext,
 ): BookingDetail {
   return {
-    ...summaryOf(row, publicPath),
+    ...summaryOf(row, context.publicPath),
     events: events.map((event) => eventOf(event, row.guest_id, row.listing_owner_id)),
-    contacts: contactsOf(row, viewerId),
+    contacts: contactsOf(row, context.viewerId),
+    deposit: context.deposit ?? null,
   };
 }

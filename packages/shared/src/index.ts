@@ -7,6 +7,7 @@ export * from './favorites';
 export * from './health';
 export * from './listings';
 export * from './notifications';
+export * from './payments';
 export * from './photos';
 export * from './pricing';
 export * from './stay-price';

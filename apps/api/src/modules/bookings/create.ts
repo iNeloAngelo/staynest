@@ -131,7 +131,10 @@ async function createdResponse(
   if (!row) throw new Error('Созданная бронь не найдена');
 
   return {
-    booking: toBookingDetail(row, await listBookingEvents(trx, bookingId), publicPath, guestId),
+    booking: toBookingDetail(row, await listBookingEvents(trx, bookingId), {
+      publicPath,
+      viewerId: guestId,
+    }),
   };
 }
 

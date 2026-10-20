@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 import { authRoutes } from './modules/auth/index';
 import type { AuthOptions } from './modules/auth/index';
 import { availabilityRoutes } from './modules/availability/index';
-import { bookingsRoutes } from './modules/bookings/index';
+import { bookingsRoutes, paymentRoutes } from './modules/bookings/index';
 import type { BookingOptions } from './modules/bookings/index';
 import { catalogRoutes } from './modules/catalog/index';
 import { dashboardRoutes } from './modules/dashboard/index';
@@ -102,6 +102,7 @@ async function registerModules({
   await app.register(availabilityRoutes, { prefix: '/api/v1', db, config });
   await app.register(pricingRoutes, { prefix: '/api/v1', db, config });
   await app.register(bookingsRoutes, { prefix: '/api/v1', config, db, events, booking });
+  await app.register(paymentRoutes, { prefix: '/api/v1', config, db });
   await app.register(notificationsRoutes, {
     prefix: '/api/v1',
     config,
@@ -146,7 +147,10 @@ export async function buildApp({ config, logger, db, ...deps }: AppDependencies)
     if (isPrivateApiUrl(request.url)) reply.header('cache-control', PRIVATE_CACHE_CONTROL);
   });
 
-  app.addHook('onRequest', createOriginGuard(config.corsOrigins));
+  app.addHook(
+    'onRequest',
+    createOriginGuard(config.corsOrigins, { allowLoopback: config.nodeEnv !== 'production' }),
+  );
 
   app.setErrorHandler(problemErrorHandler);
   app.setNotFoundHandler(problemNotFoundHandler);

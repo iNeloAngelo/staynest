@@ -1,4 +1,4 @@
-import { createBookingJobs } from './modules/bookings/index';
+import { createBookingJobs, createPaymentJobs } from './modules/bookings/index';
 import { createNotificationService } from './modules/notifications/index';
 import { loadConfig } from './platform/config/index';
 import { createDb } from './platform/db/index';
@@ -14,6 +14,7 @@ const logger = createLogger(config.logLevel, config.nodeEnv === 'development');
 const db = createDb(config.databaseUrl, logger, config.dbQueryTimeoutMs);
 const events = createEventBus(logger);
 const bookingJobs = createBookingJobs({ db, config, events, logger });
+const paymentJobs = createPaymentJobs({ db, config, events, logger });
 const notifications = createNotificationService({ db, config, logger, events });
 
 const runner = await startJobRunner({
@@ -41,10 +42,15 @@ const runner = await startJobRunner({
       cron: '30 3 * * *',
       run: () => bookingJobs.cleanupIdempotency(),
     },
+    {
+      name: 'payments.expire-deposits',
+      cron: '*/5 * * * *',
+      run: () => paymentJobs.expireDeposits(),
+    },
   ],
 });
 
-logger.info({ jobs: 4 }, 'worker started');
+logger.info({ jobs: 5 }, 'worker started');
 
 let shuttingDown = false;
 

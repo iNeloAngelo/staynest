@@ -73,6 +73,7 @@ export interface Bookings {
   confirmed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   currency: string;
+  deposit_due_at: Timestamp | null;
   expires_at: Timestamp | null;
   guest_id: string;
   guest_message: string | null;

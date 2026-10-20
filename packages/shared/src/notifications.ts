@@ -10,6 +10,7 @@ export const notificationTypeSchema = z.enum([
   'booking_declined',
   'booking_cancelled',
   'booking_expired',
+  'booking_deposit_expired',
   'booking_expiring_soon',
   'booking_completed',
 ]);

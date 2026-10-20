@@ -93,6 +93,12 @@ export function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       maxActivePending: 5,
       rateLimit: { max: 1_000, windowMs: 60_000 },
     },
+    payments: overrides.payments ?? {
+      mockEnabled: true,
+      depositPercent: 20,
+      depositTtlHours: 48,
+      webhookSecret: 'test-payment-webhook-secret-with-32-chars',
+    },
     push: overrides.push ?? {
       enabled: false,
       publicKey: null,

@@ -22,6 +22,9 @@ import {
 } from './repo';
 import { resolveTransition, transitionRequiresReason } from './state-machine';
 import type { BookingAction, BookingActorRole } from './state-machine';
+import { depositOf } from './payments/mapping';
+import { refundSucceededDeposit, listDeposits, failOpenDeposits } from './payments/repo';
+import { createDepositForConfirmed, depositAmountMinor, depositDueAt } from './payments/service';
 
 type TransitionInput = {
   comment?: string;
@@ -48,11 +51,18 @@ type PatchContext = {
   actorId: string;
   input: TransitionInput;
   now: Date;
+  depositDueAt: Date | null;
 };
 
 function patchFor(context: PatchContext): Updateable<Bookings> {
-  const { action, target, actorId, input, now } = context;
-  if (action === 'confirm') return { expires_at: null, confirmed_at: now };
+  const { action, target, actorId, input, now, depositDueAt } = context;
+  if (action === 'confirm') {
+    return {
+      expires_at: null,
+      confirmed_at: now,
+      ...(depositDueAt ? { deposit_due_at: depositDueAt } : {}),
+    };
+  }
   if (action === 'decline') return { host_response: input.comment ?? null };
   if (transitionRequiresReason(target) && !input.reason) throw hostCancelReasonRequired();
 
@@ -149,6 +159,83 @@ type ApplyContext = {
   now: Date;
 };
 
+type LockedBooking = NonNullable<ExpireContext['row']>;
+
+function depositDeadlineFor(
+  runtime: BookingRuntime,
+  action: BookingAction,
+  row: LockedBooking,
+  now: Date,
+): Date | null {
+  if (action !== 'confirm' || !runtime.config.payments.mockEnabled) return null;
+  const amount = depositAmountMinor(Number(row.total_minor), runtime.config.payments.depositPercent);
+  return amount === null ? null : depositDueAt(runtime.config.payments.depositTtlHours, now);
+}
+
+type DepositEffectsInput = {
+  trx: DbExecutor;
+  runtime: BookingRuntime;
+  action: BookingAction;
+  row: LockedBooking;
+  depositAt: Date | null;
+};
+
+async function applyDepositEffects(input: DepositEffectsInput): Promise<void> {
+  const { trx, runtime, action, row, depositAt } = input;
+  if (depositAt !== null) {
+    await createDepositForConfirmed(trx, {
+      bookingId: row.id,
+      totalMinor: Number(row.total_minor),
+      currency: row.currency,
+      percent: runtime.config.payments.depositPercent,
+    });
+  }
+  if (action === 'cancel') {
+    // Гость или хозяин отменили бронь: оплаченный депозит возвращается,
+    // а открытые сессии закрываются, иначе страница оплаты остаётся живой.
+    await refundSucceededDeposit(trx, row.id, 'booking_cancelled');
+    await failOpenDeposits(trx, row.id, 'booking_cancelled');
+  }
+}
+
+async function detailFor(
+  trx: DbExecutor,
+  runtime: BookingRuntime,
+  bookingId: string,
+  actorId: string,
+) {
+  const updated = await findBookingById(trx, bookingId);
+  if (!updated) throw new Error('Обновлённая бронь не найдена');
+
+  return toBookingDetail(updated, await listBookingEvents(trx, bookingId), {
+    publicPath: runtime.config.storage.publicPath,
+    viewerId: actorId,
+    deposit: depositOf(updated.deposit_due_at, await listDeposits(trx, bookingId)),
+  });
+}
+
+function actionPayload(
+  row: LockedBooking,
+  target: BookingStatus,
+  now: Date,
+): BookingEventPayload {
+  return {
+    bookingId: row.id,
+    listingId: row.listing_id,
+    guestId: row.guest_id,
+    hostId: row.listing_owner_id,
+    status: target,
+    occurredAt: now.toISOString(),
+    listingTitle: row.listing_title,
+    checkIn: row.check_in ?? '',
+    checkOut: row.check_out ?? '',
+    guestName: row.guest_display_name,
+    totalMinor: Number(row.total_minor),
+    currency: row.currency.trim(),
+    ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
+  };
+}
+
 async function applyOnLockedRow(context: ApplyContext): Promise<TransitionOutcome> {
   const { trx, runtime, request, row, now } = context;
   const { actorId, bookingId, action, input = {} } = request;
@@ -165,12 +252,14 @@ async function applyOnLockedRow(context: ApplyContext): Promise<TransitionOutcom
     today: todayOf(runtime),
   });
 
+  const depositAt = depositDeadlineFor(runtime, action, row, now);
   await updateBookingStatus(
     trx,
     bookingId,
     target,
-    patchFor({ action, target, actorId, input, now }),
+    patchFor({ action, target, actorId, input, now, depositDueAt: depositAt }),
   );
+  await applyDepositEffects({ trx, runtime, action, row, depositAt });
   await insertBookingEvent(trx, {
     bookingId,
     actorId,
@@ -179,34 +268,10 @@ async function applyOnLockedRow(context: ApplyContext): Promise<TransitionOutcom
     note: noteFor(action, input),
   });
 
-  const updated = await findBookingById(trx, bookingId);
-  if (!updated) throw new Error('Обновлённая бронь не найдена');
-
   return {
     kind: 'action',
-    body: {
-      booking: toBookingDetail(
-        updated,
-        await listBookingEvents(trx, bookingId),
-        runtime.config.storage.publicPath,
-        actorId,
-      ),
-    },
-    payload: {
-      bookingId,
-      listingId: row.listing_id,
-      guestId: row.guest_id,
-      hostId: row.listing_owner_id,
-      status: target,
-      occurredAt: now.toISOString(),
-      listingTitle: row.listing_title,
-      checkIn: row.check_in ?? '',
-      checkOut: row.check_out ?? '',
-      guestName: row.guest_display_name,
-      totalMinor: Number(row.total_minor),
-      currency: row.currency.trim(),
-      ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
-    },
+    body: { booking: await detailFor(trx, runtime, bookingId, actorId) },
+    payload: actionPayload(row, target, now),
     action,
   };
 }

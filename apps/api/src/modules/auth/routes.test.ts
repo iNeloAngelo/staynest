@@ -75,6 +75,12 @@ function makeConfig(): AppConfig {
       argon2: { memoryCost: 19_456, timeCost: 2, parallelism: 1 },
     },
     mail: { host: 'localhost', port: 1025, from: 'StayNest <no-reply@staynest.local>' },
+    payments: {
+      mockEnabled: true,
+      depositPercent: 20,
+      depositTtlHours: 48,
+      webhookSecret: 'test-payment-webhook-secret-with-32-chars',
+    },
     storage: {
       endpoint: 'http://localhost:9000',
       region: 'us-east-1',

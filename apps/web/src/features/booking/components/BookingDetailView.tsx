@@ -11,6 +11,7 @@ import { Skeleton } from '../../../shared/ui/Skeleton';
 import { useBooking } from '../api/bookings-hooks';
 import { canGuestCancel, canHostCancel, canHostDecide } from '../model/status';
 import { BookingActions } from './BookingActions';
+import { DepositPanel, PaymentNotice } from './DepositPanel';
 import {
   BookingContacts,
   BookingHeading,
@@ -87,14 +88,16 @@ export function BookingDetailView() {
   const { id } = useParams<{ id: string }>();
   const [params, setParams] = useSearchParams();
   const [created] = useState(() => params.get('created') === '1');
+  const [paymentResult] = useState(() => params.get('payment') ?? '');
   const online = useOnline();
   const { data: user } = useMe();
   const query = useBooking(id);
 
   useEffect(() => {
-    if (!params.has('created')) return;
+    if (!params.has('created') && !params.has('payment')) return;
     const next = new URLSearchParams(params);
     next.delete('created');
+    next.delete('payment');
     setParams(next, { replace: true });
   }, [params, setParams]);
 
@@ -122,6 +125,7 @@ export function BookingDetailView() {
       <BookingHeading booking={booking} role={role} />
 
       {created ? <CreatedNotice booking={booking} role={role} /> : null}
+      <PaymentNotice result={paymentResult} deposit={booking.deposit} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div className="flex flex-col gap-6">
@@ -132,6 +136,7 @@ export function BookingDetailView() {
 
         <aside className="flex flex-col gap-4">
           <BookingPrice booking={booking} />
+          <DepositPanel booking={booking} viewer={role} />
           {actionable ? (
             <div className="rounded-lg border border-border bg-surface p-4">
               <BookingActions booking={booking} role={role} />

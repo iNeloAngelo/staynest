@@ -174,6 +174,10 @@ CORS_ORIGINS=https://example.com
 APP_WEB_URL=https://example.com
 JWT_SECRET=<openssl rand -base64 48>
 REQUIRE_EMAIL_VERIFICATION=true
+PAYMENT_MOCK_ENABLED=true
+PAYMENT_DEPOSIT_PERCENT=20
+PAYMENT_DEPOSIT_TTL_HOURS=48
+PAYMENT_WEBHOOK_SECRET=<openssl rand -base64 48>
 SMTP_HOST=mailpit
 SMTP_PORT=1025
 S3_ENDPOINT=http://silo:9000
@@ -547,4 +551,12 @@ ssh -N -L 5433:127.0.0.1:5433 staynest
 Пароль `admin`/`admin` намеренно невозможен: политика требует минимум 10
 символов и проверяет пароль по списку утечек. Для тестирования используйте
 демо-аккаунты выше.
+
+Депозит на стенде работает через мок-провайдера: хозяин подтверждает заявку,
+гость нажимает «Оплатить депозит», попадает на отдельную страницу
+`/api/v1/mock-payments/:token` и возвращается на бронь. Если
+`PAYMENT_MOCK_ENABLED=true`, в `.env` обязателен `PAYMENT_WEBHOOK_SECRET`
+(иначе API намеренно не стартует; секрет нужен в production всегда);
+`PAYMENT_MOCK_ENABLED=false` отключает депозит целиком и не регистрирует
+публичные маршруты мока. Подробности — `docs/payments.md`.
 

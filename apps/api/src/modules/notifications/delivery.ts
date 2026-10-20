@@ -23,6 +23,7 @@ const PUSH_ENABLED_TYPES: ReadonlySet<NotificationType> = new Set([
   'booking_declined',
   'booking_cancelled',
   'booking_expiring_soon',
+  'booking_deposit_expired',
 ]);
 
 export type NotificationRuntime = {
@@ -165,6 +166,19 @@ async function onExpiringSoon(
   });
 }
 
+async function onDepositExpired(
+  runtime: NotificationRuntime,
+  event: BookingEventPayload,
+): Promise<void> {
+  for (const role of ['guest', 'host'] as const) {
+    await createFor(runtime, {
+      userId: recipientOf(event, role),
+      type: 'booking_deposit_expired',
+      payload: notificationPayload(event),
+    });
+  }
+}
+
 export function subscribeBookingEvents(runtime: NotificationRuntime): () => void {
   const events = runtime.events;
   const unsubscribers = [
@@ -181,6 +195,7 @@ export function subscribeBookingEvents(runtime: NotificationRuntime): () => void
     events.subscribe('booking.expired', (event) =>
       onBookingEvent(runtime, 'booking_expired', event, 'guest'),
     ),
+    events.subscribe('booking.deposit_expired', (event) => onDepositExpired(runtime, event)),
     events.subscribe('booking.completed', (event) =>
       onBookingEvent(runtime, 'booking_completed', event, 'guest'),
     ),

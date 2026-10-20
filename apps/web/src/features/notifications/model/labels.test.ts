@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TFunction } from 'i18next';
 import { createInstance } from 'i18next';
+import { notificationTypeSchema } from '@staynest/shared';
 import { en } from '../../../shared/i18n/resources/en';
 import { ru } from '../../../shared/i18n/resources/ru';
 import { demoNotification } from '../../../test/api-mocks';
@@ -48,6 +49,6 @@ describe('подписи уведомлений', () => {
     const notification = demoNotification();
 
     expect(notificationHref(notification)).toBe(`/bookings/${notification.payload.bookingId}`);
-    expect(Object.keys(NOTIFICATION_META)).toHaveLength(7);
+    expect(Object.keys(NOTIFICATION_META).sort()).toEqual([...notificationTypeSchema.options].sort());
   });
 });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { nightsBetween } from './dates';
+import { bookingDepositSchema } from './payments';
 import { MAX_QUOTE_NIGHTS, bookingStatusSchema, isoDateSchema, quoteSchema } from './pricing';
 
 export const BOOKING_MESSAGE_MAX = 1000;
@@ -157,6 +158,8 @@ export const bookingContactsSchema = z.object({
 export const bookingDetailSchema = bookingSummarySchema.extend({
   events: z.array(bookingEventSchema),
   contacts: bookingContactsSchema.nullable(),
+  /** Депозит появляется после подтверждения хозяином. */
+  deposit: bookingDepositSchema.nullable(),
 });
 
 export const bookingResponseSchema = z.object({ booking: bookingDetailSchema });

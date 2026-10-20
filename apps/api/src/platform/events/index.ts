@@ -37,6 +37,7 @@ type AppEventMap = {
   'booking.declined': BookingEventPayload;
   'booking.cancelled': BookingEventPayload & { actorId: string };
   'booking.expired': BookingEventPayload;
+  'booking.deposit_expired': BookingEventPayload;
   'booking.expiring_soon': BookingEventPayload;
   'booking.completed': BookingEventPayload;
 };

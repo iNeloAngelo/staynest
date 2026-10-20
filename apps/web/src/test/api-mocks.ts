@@ -200,6 +200,17 @@ export function demoBookingDetail(status: BookingSummary['status'] = 'pending'):
         createdAt: booking.createdAt,
       },
     ],
+    deposit:
+      status === 'confirmed'
+        ? {
+            status: 'created',
+            amountMinor: 330_000,
+            currency: 'RUB',
+            dueAt: addDays(todayLocalIso(), 2) + 'T12:00:00.000Z',
+            paidAt: null,
+            refundedAt: null,
+          }
+        : null,
   };
 }
 

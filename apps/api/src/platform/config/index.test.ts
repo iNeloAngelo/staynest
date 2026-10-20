@@ -10,6 +10,7 @@ const baseEnv = {
   S3_ENDPOINT: 'https://s3.example',
   S3_BUCKET: 'staynest-media',
   S3_SECRET_KEY: 'production-secret',
+  PAYMENT_WEBHOOK_SECRET: 'production-payment-secret-with-32-chars',
 };
 
 const prodEnv = { ...baseEnv, NODE_ENV: 'production' };
@@ -87,6 +88,28 @@ describe('loadConfig', () => {
       /S3_SECRET_KEY/,
     );
     expect(() => loadConfig({ ...prodEnv, S3_ENDPOINT: '' })).toThrow(/S3_ENDPOINT/);
+  });
+
+  it('падает в production без PAYMENT_WEBHOOK_SECRET', () => {
+    expect(() => loadConfig({ ...prodEnv, PAYMENT_WEBHOOK_SECRET: '' })).toThrow(
+      /PAYMENT_WEBHOOK_SECRET/,
+    );
+  });
+
+  it('разбирает параметры депозита', () => {
+    const config = loadConfig({
+      ...baseEnv,
+      NODE_ENV: 'test',
+      PAYMENT_DEPOSIT_PERCENT: '25',
+      PAYMENT_DEPOSIT_TTL_HOURS: '72',
+      PAYMENT_MOCK_ENABLED: 'false',
+    });
+
+    expect(config.payments).toMatchObject({
+      mockEnabled: false,
+      depositPercent: 25,
+      depositTtlHours: 72,
+    });
   });
 
   it('нормализует завершающий слэш в CORS_ORIGINS', () => {
