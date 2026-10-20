@@ -245,7 +245,8 @@ describe('App', () => {
     mockApi({ user: demoUser });
     renderApp(['/profile']);
 
-    expect(await screen.findByRole('heading', { name: 'Анна', level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Профиль', level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('Анна')).toBeInTheDocument();
     expect(screen.getAllByText('anna@example.com').length).toBeGreaterThan(0);
     expect(screen.getByText('Подтверждён')).toBeInTheDocument();
   });

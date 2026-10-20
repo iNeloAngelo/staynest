@@ -6,12 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import { authErrorKey, useLogout, useMe } from '../../features/auth';
 import { ModeSwitchControl } from '../../features/mode-switch';
 import { PushToggle, detachCurrentDevicePush } from '../../features/notifications';
+import { PasswordCard, ProfileAvatar, ProfileForm, useUpdateProfile } from '../../features/profile';
 import { useLocale } from '../../shared/i18n';
 import { Badge, Button, Select, useToast } from '../../shared/ui';
-
-function initial(name: string): string {
-  return name.trim().charAt(0).toLocaleUpperCase() || '?';
-}
 
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -46,13 +43,28 @@ function AccountCard({ user }: { user: UserDto }) {
 function SettingsCard() {
   const { t } = useTranslation();
   const { locale, setLocale } = useLocale();
+  const { data: user } = useMe();
+  const update = useUpdateProfile();
+  const toast = useToast();
+
+  async function onLanguage(value: string): Promise<void> {
+    const next = value === 'en' ? 'en' : 'ru';
+    setLocale(next);
+    if (!user) return;
+
+    try {
+      await update.mutateAsync({ locale: next });
+    } catch {
+      toast.show({ title: t('profile.saveError'), tone: 'error' });
+    }
+  }
 
   return (
     <section className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6">
       <Select
         label={t('profile.language')}
         value={locale}
-        onChange={(event) => setLocale(event.target.value === 'en' ? 'en' : 'ru')}
+        onChange={(event) => void onLanguage(event.target.value)}
         options={[
           { value: 'ru', label: 'Русский' },
           { value: 'en', label: 'English' },
@@ -89,23 +101,24 @@ export function ProfilePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex items-center gap-4">
-        <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-h2 font-semibold text-on-primary">
-          {initial(user.displayName)}
-        </span>
-
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h1 className="truncate text-h1 text-ink">{user.displayName}</h1>
-          <p className="truncate text-small text-ink-muted">{user.email}</p>
-        </div>
+      <header>
+        <h1 className="text-h1 text-ink">{t('profile.title')}</h1>
+        <p className="mt-1 text-small text-ink-muted">{t('profile.subtitle')}</p>
       </header>
 
+      <section className="rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6">
+        <ProfileAvatar user={user} />
+      </section>
+
+      <ProfileForm key={user.id} user={user} />
       <AccountCard user={user} />
       <SettingsCard />
 
       <section className="rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6">
         <PushToggle enabled userId={user.id} />
       </section>
+
+      <PasswordCard />
 
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6">
         <div>

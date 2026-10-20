@@ -33,6 +33,11 @@ const ListingEditorPage = lazy(() =>
 const HostCalendarPage = lazy(() =>
   import('../pages/host-calendar/HostCalendarPage').then((m) => ({ default: m.HostCalendarPage })),
 );
+const HostDashboardPage = lazy(() =>
+  import('../pages/host-dashboard/HostDashboardPage').then((m) => ({
+    default: m.HostDashboardPage,
+  })),
+);
 
 const DevUiPage = import.meta.env.DEV ? lazy(() => import('../pages/dev-ui/DevUiPage')) : null;
 
@@ -59,6 +64,7 @@ export function App() {
               <Route path="trips" element={<TripsPage />} />
               <Route path="bookings/:id" element={<BookingPage />} />
               <Route path="favorites" element={<FavoritesPage />} />
+              <Route path="host" element={<HostDashboardPage />} />
               <Route path="host/listings" element={<HostListingsPage />} />
               <Route path="host/listings/:id" element={<ListingEditorPage />} />
               <Route path="host/requests" element={<HostRequestsPage />} />

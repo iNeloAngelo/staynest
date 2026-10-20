@@ -1,4 +1,13 @@
-import { CalendarDays, Heart, House, Inbox, Luggage, Search, UserRound } from 'lucide-react';
+import {
+  CalendarDays,
+  Heart,
+  House,
+  Inbox,
+  LayoutDashboard,
+  Luggage,
+  Search,
+  UserRound,
+} from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation } from 'react-router-dom';
@@ -12,10 +21,10 @@ function useNavItems(hostMode: boolean): BottomNavItem[] {
 
   if (hostMode) {
     return [
+      { to: '/host', label: t('nav.host.dashboard'), icon: LayoutDashboard, end: true },
       { to: '/host/listings', label: t('nav.host.listings'), icon: House },
       { to: '/host/requests', label: t('nav.host.requests'), icon: Inbox },
       { to: '/host/calendar', label: t('nav.host.calendar'), icon: CalendarDays },
-      { to: '/profile', label: t('nav.host.profile'), icon: UserRound },
     ];
   }
 

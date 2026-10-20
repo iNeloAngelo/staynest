@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { useLocale } from '../../../shared/i18n';
 import { formatMoney } from '../../../shared/lib/format';
+import { FavoriteButton } from '../../favorites/components/FavoriteButton';
 
 function CardPhoto({ listing, eager }: { listing: PublicListingSummary; eager: boolean }) {
   const { t } = useTranslation();
@@ -53,37 +54,41 @@ export function ListingCard({
   const stayPrice = stay ? formatMoney(stay.totalMinor, locale, stay.currency) : null;
 
   return (
-    <Link
-      to={`/listings/${listing.id}`}
-      state={{ from: `${location.pathname}${location.search}` }}
-      className="group flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-shadow duration-panel hover:shadow-md"
-    >
-      <CardPhoto listing={listing} eager={eager} />
+    <div className="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-shadow duration-panel hover:shadow-md">
+      <Link
+        to={`/listings/${listing.id}`}
+        state={{ from: `${location.pathname}${location.search}` }}
+        className="flex flex-1 flex-col"
+      >
+        <CardPhoto listing={listing} eager={eager} />
 
-      <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <span className="text-caption font-medium tracking-wide text-ink-muted uppercase">
-          {t(`listings.type.${listing.type}`)}
-        </span>
+        <div className="flex flex-1 flex-col gap-1.5 p-4">
+          <span className="text-caption font-medium tracking-wide text-ink-muted uppercase">
+            {t(`listings.type.${listing.type}`)}
+          </span>
 
-        <h3 className="line-clamp-2 text-h3 text-ink">{listing.title}</h3>
+          <h3 className="line-clamp-2 text-h3 text-ink">{listing.title}</h3>
 
-        <p className="text-small text-ink-muted">
-          {[listing.city, listing.region].filter(Boolean).join(', ')}
-        </p>
+          <p className="text-small text-ink-muted">
+            {[listing.city, listing.region].filter(Boolean).join(', ')}
+          </p>
 
-        <p className="text-small text-ink-muted">
-          {t('catalog.card.guests', { count: listing.maxGuests })} ·{' '}
-          {t('catalog.card.bedrooms', { count: listing.bedrooms })} ·{' '}
-          {t('catalog.card.beds', { count: listing.beds })}
-        </p>
+          <p className="text-small text-ink-muted">
+            {t('catalog.card.guests', { count: listing.maxGuests })} ·{' '}
+            {t('catalog.card.bedrooms', { count: listing.bedrooms })} ·{' '}
+            {t('catalog.card.beds', { count: listing.beds })}
+          </p>
 
-        <p className="mt-auto pt-2 text-body font-semibold text-ink tabular-nums">
-          {stay && stayPrice
-            ? t('catalog.card.stayTotal', { price: stayPrice, count: stay.nights })
-            : t('catalog.card.perNight', { price })}
-        </p>
-      </div>
-    </Link>
+          <p className="mt-auto pt-2 text-body font-semibold text-ink tabular-nums">
+            {stay && stayPrice
+              ? t('catalog.card.stayTotal', { price: stayPrice, count: stay.nights })
+              : t('catalog.card.perNight', { price })}
+          </p>
+        </div>
+      </Link>
+
+      <FavoriteButton listingId={listing.id} className="absolute top-2 right-2 z-10" />
+    </div>
   );
 }
 

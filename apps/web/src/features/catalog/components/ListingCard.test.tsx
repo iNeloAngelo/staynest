@@ -1,14 +1,27 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { queryKeys } from '../../../shared/api';
+import { ToastProvider } from '../../../shared/ui';
 import { demoPublicListing } from '../../../test/api-mocks';
 import { ListingCard } from './ListingCard';
 
 function renderCard(stayPrice: typeof demoPublicListing.stayPrice) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  // Карточка содержит сердечко: без вошедшего пользователя оно не запрашивает id.
+  queryClient.setQueryData(queryKeys.me, null);
+
   return render(
-    <MemoryRouter>
-      <ListingCard listing={{ ...demoPublicListing, stayPrice }} />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <MemoryRouter>
+          <ListingCard listing={{ ...demoPublicListing, stayPrice }} />
+        </MemoryRouter>
+      </ToastProvider>
+    </QueryClientProvider>,
   );
 }
 

@@ -46,3 +46,13 @@ export function formatDateTime(value: string, language: string): string {
     minute: '2-digit',
   }).format(date);
 }
+
+/** Месяц графика `YYYY-MM`: короткое название без дня и года. */
+export function formatMonth(value: string, language: string): string {
+  const [year, month] = value.split('-').map(Number);
+  const date = new Date(year ?? 1970, (month ?? 1) - 1, 1, 12);
+
+  return new Intl.DateTimeFormat(language.startsWith('en') ? 'en-US' : 'ru-RU', {
+    month: 'short',
+  }).format(date);
+}

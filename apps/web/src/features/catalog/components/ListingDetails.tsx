@@ -6,6 +6,7 @@ import { ApiError } from '../../../shared/api';
 import { Button } from '../../../shared/ui/Button';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { useListing } from '../api/hooks';
+import { FavoriteButton } from '../../favorites/components/FavoriteButton';
 import { BookingAside, MobileBooking } from './BookingWidgets';
 import { PhotoGallery } from './PhotoGallery';
 import {
@@ -36,7 +37,10 @@ function ListingContent({ listing }: { listing: PublicListing }) {
         <p className="text-small font-semibold tracking-wide text-primary uppercase">
           {t(`listings.type.${listing.type}`)}
         </p>
-        <h1 className="text-h1 text-ink lg:text-h1-lg">{listing.title}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-h1 text-ink lg:text-h1-lg">{listing.title}</h1>
+          <FavoriteButton listingId={listing.id} className="mt-1 shrink-0" />
+        </div>
         <p className="text-body text-ink-muted">
           {[listing.city, listing.region].filter(Boolean).join(', ')}
         </p>

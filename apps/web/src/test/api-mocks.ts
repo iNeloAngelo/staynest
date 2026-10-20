@@ -3,6 +3,7 @@ import type {
   BookingDetail,
   BookingSummary,
   CalendarResponse,
+  DashboardResponse,
   HostCalendarResponse,
   ListingDto,
   ListingPhotoDto,
@@ -23,6 +24,7 @@ export const demoUser: UserDto = {
   displayName: 'Анна',
   phone: null,
   avatarKey: null,
+  avatarUrl: null,
   locale: 'ru',
   emailVerified: true,
   createdAt: '2026-10-19T10:00:00.000Z',
@@ -275,6 +277,41 @@ function demoHostCalendar(listingId: string, url: string): HostCalendarResponse 
   };
 }
 
+export function demoDashboard(): DashboardResponse {
+  const today = todayLocalIso();
+  const month = today.slice(0, 7);
+
+  return {
+    today,
+    pendingRequests: 1,
+    upcomingCheckIns: [
+      {
+        bookingId: '0c9f2c1e-4a3b-4c5d-8e6f-7a8b9c0d1e2f',
+        listingId: demoListing.id,
+        listingTitle: 'Дом у озера',
+        city: 'Суздаль',
+        guestName: 'Анна',
+        checkIn: addDays(today, 10),
+        checkOut: addDays(today, 14),
+        guestsCount: 2,
+      },
+    ],
+    occupancy: {
+      from: today,
+      to: addDays(today, 30),
+      totalNights: 30,
+      bookedNights: 4,
+      blockedNights: 2,
+      occupiedNights: 6,
+      percent: 20,
+    },
+    revenue: {
+      currency: 'RUB',
+      months: [{ month, totalMinor: 250_000, bookings: 1 }],
+    },
+  };
+}
+
 export function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -297,6 +334,8 @@ export type ApiMockOptions = {
   notifications?: NotificationDto[];
   unreadCount?: number;
   pushEnabled?: boolean;
+  favoriteIds?: string[];
+  dashboard?: DashboardResponse;
   bookingCreateStatus?: number;
   bookingCreateBody?: unknown;
   pendingHostCalendar?: boolean;
@@ -323,6 +362,32 @@ const SIMPLE_ROUTES: Array<[string, () => Response]> = [
 
 function sessionResponse(user: UserDto | null): Response {
   return user ? jsonResponse({ user }) : jsonResponse({ code: 'unauthorized' }, 401);
+}
+
+function profileRoute({ url, method, init, options }: RouteContext): Response | null {
+  const base = options.user ?? demoUser;
+
+  if (method === 'PATCH' && url.endsWith('/me')) {
+    const patch = JSON.parse((init?.body as string | undefined) ?? '{}') as Partial<UserDto>;
+    return jsonResponse({ user: { ...base, ...patch } });
+  }
+
+  if (url.endsWith('/me/avatar')) {
+    return jsonResponse({
+      user:
+        method === 'DELETE'
+          ? { ...base, avatarKey: null, avatarUrl: null }
+          : {
+              ...base,
+              avatarKey: 'avatars/demo/photo.webp',
+              avatarUrl: '/media/avatars/demo/photo.webp',
+            },
+    });
+  }
+
+  if (url.endsWith('/auth/change-password')) return new Response(null, { status: 204 });
+
+  return null;
 }
 
 function authRoute({ url, options }: RouteContext): Response | null {
@@ -587,9 +652,54 @@ function notificationsRoute({ url, method, options }: RouteContext): Response | 
   return null;
 }
 
-function route(ctx: RouteContext, details: Map<string, BookingDetail>): Response {
+function favoritesRoute(
+  { url, method, options }: RouteContext,
+  favoriteIds: Set<string>,
+): Response | null {
+  if (url.includes('/me/favorites/ids')) {
+    return jsonResponse({ listingIds: [...favoriteIds] });
+  }
+
+  const match = /\/me\/favorites\/([^/?]+)/.exec(url);
+  if (match?.[1] && method === 'PUT') {
+    favoriteIds.add(match[1]);
+    return jsonResponse({ listingId: match[1], favorite: true });
+  }
+  if (match?.[1] && method === 'DELETE') {
+    favoriteIds.delete(match[1]);
+    return jsonResponse({ listingId: match[1], favorite: false });
+  }
+  if (url.includes('/me/favorites') && method === 'GET') {
+    const listings = (options.catalogListings ?? [demoPublicListing]).filter((listing) =>
+      favoriteIds.has(listing.id),
+    );
+    return jsonResponse({ listings, nextCursor: null });
+  }
+
+  return null;
+}
+
+function dashboardRoute({ url, options }: RouteContext): Response | null {
+  if (!url.includes('/me/dashboard')) return null;
+  return jsonResponse(options.dashboard ?? demoDashboard());
+}
+
+function route(
+  ctx: RouteContext,
+  details: Map<string, BookingDetail>,
+  favoriteIds: Set<string>,
+): Response {
   const auth = authRoute(ctx);
   if (auth) return auth;
+
+  const profile = profileRoute(ctx);
+  if (profile) return profile;
+
+  const favorites = favoritesRoute(ctx, favoriteIds);
+  if (favorites) return favorites;
+
+  const dashboard = dashboardRoute(ctx);
+  if (dashboard) return dashboard;
 
   const notifications = notificationsRoute(ctx);
   if (notifications) return notifications;
@@ -615,6 +725,7 @@ export function mockApi(options: ApiMockOptions = {}): ReturnType<typeof vi.fn> 
     details.set(booking.id, { ...demoBookingDetail(booking.status), ...booking });
   }
   if (options.bookingDetail) details.set(options.bookingDetail.id, options.bookingDetail);
+  const favoriteIds = new Set(options.favoriteIds ?? []);
 
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     options.onRequest?.(String(input), init);
@@ -622,7 +733,9 @@ export function mockApi(options: ApiMockOptions = {}): ReturnType<typeof vi.fn> 
       return new Promise<Response>(() => undefined);
     }
     const method = (init?.method ?? 'GET').toUpperCase();
-    return Promise.resolve(route({ url: String(input), method, init, store, options }, details));
+    return Promise.resolve(
+      route({ url: String(input), method, init, store, options }, details, favoriteIds),
+    );
   });
 
   vi.stubGlobal('fetch', fetchMock);
