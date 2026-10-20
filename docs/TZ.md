@@ -139,6 +139,7 @@ stateDiagram-v2
 **Аккаунт**
 - `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
 - `GET /me`, `PATCH /me`
+- `POST /me/avatar` (multipart, поле `avatar`), `DELETE /me/avatar`
 
 **Справочники**
 - `GET /amenities`
@@ -166,6 +167,10 @@ stateDiagram-v2
 
 **Избранное**
 - `GET /me/favorites`, `PUT /me/favorites/:listingId`, `DELETE /me/favorites/:listingId`
+- `GET /me/favorites/ids` — идентификаторы опубликованных избранных домов для сердечек
+
+**Панель хозяина**
+- `GET /me/dashboard?months=1..12` — заявки, ближайшие заезды, занятость 30 дней, доход по месяцам
 
 **Уведомления**
 - `GET /me/notifications`, `POST /me/notifications/read`

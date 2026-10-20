@@ -46,7 +46,7 @@ apps/api/src/
    │  ├─ README.md        зачем модуль, публичный API, таблицы, события, как тестировать
    │  └─ *.test.ts        тесты рядом с кодом
    ├─ listings/  photos/  pricing/  availability/
-   ├─ catalog/  bookings/  notifications/  favorites/  dashboard/  users/
+   ├─ catalog/  bookings/  notifications/  favorites/  dashboard/  profile/  users/
 ```
 
 Слои внутри модуля: `routes → service → repo`. Вниз можно, вверх нельзя. `routes` не ходит в БД, `repo` не знает про HTTP.
@@ -73,7 +73,8 @@ flowchart TD
 apps/web/src/
 ├─ app/                   провайдеры, роутер, макет, ErrorBoundary, регистрация service worker
 ├─ pages/                 экраны уровня маршрута, ТОНКИЕ: собирают фичи
-│  ├─ home/  listing/  host-listings/  host-requests/  trips/  profile/  login/  not-found/
+│  ├─ home/  listing/  host-dashboard/  host-listings/  host-requests/  host-calendar/
+│  ├─ trips/  favorites/  profile/  login/  not-found/
 ├─ features/              законченные пользовательские блоки
 │  └─ catalog/
 │     ├─ index.ts         публичный интерфейс фичи (компоненты и хуки, доступные снаружи)

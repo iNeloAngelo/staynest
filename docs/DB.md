@@ -85,7 +85,7 @@ $$ LANGUAGE plpgsql;
 | password_hash | text | NULL допустим (вход только через Telegram, Сессия 19). Argon2id |
 | display_name | text | NOT NULL, длина 1–80 |
 | phone | text | NULL |
-| avatar_key | text | NULL, ключ в MinIO |
+| avatar_key | text | NULL, ключ в S3 `avatars/<user_id>/<uuid>.webp` (модуль `profile`) |
 | locale | text | NOT NULL, default 'ru', CHECK IN ('ru','en') |
 | is_active | boolean | NOT NULL, default true |
 | email_verified_at | timestamptz | NULL, момент подтверждения email (NULL = не подтверждён) |
@@ -525,6 +525,13 @@ CREATE TABLE favorites (
 );
 CREATE INDEX favorites_user_idx ON favorites (user_id, created_at DESC);
 ```
+
+Избранное доступно только владельцу: `GET /me/favorites`, `GET /me/favorites/ids`,
+`PUT|DELETE /me/favorites/:listingId`. Добавлять можно только опубликованное
+объявление. Список отдаёт публичные карточки через read-модель `catalog`, а не
+собственный DTO. После удаления объявления строка избранного удаляется
+каскадом; архивные объявления остаются в таблице, но скрываются из API
+(`TODO.md`, Backlog).
 
 ## 14. notifications — внутренние уведомления
 
