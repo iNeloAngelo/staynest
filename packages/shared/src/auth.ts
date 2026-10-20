@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+/** Аватар: один квадрат 512 px, лимит исходника 5 МБ. */
+export const AVATAR_SIZE = 512;
+export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
 export const localeSchema = z.enum(['ru', 'en']);
 
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
@@ -64,7 +68,9 @@ export const userDtoSchema = z.object({
   email: z.string(),
   displayName: z.string(),
   phone: z.string().nullable(),
+  /** Ключ в S3; клиенту нужен готовый URL, поэтому отдаём и его. */
   avatarKey: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
   locale: localeSchema,
   emailVerified: z.boolean(),
   createdAt: z.iso.datetime(),

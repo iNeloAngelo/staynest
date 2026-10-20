@@ -6,6 +6,7 @@ import {
   insertUser,
   lockUserRow,
   markEmailVerified,
+  updateAvatarKey,
   updatePasswordHash,
   updateUserProfile,
 } from './repo';
@@ -17,13 +18,23 @@ function toLocale(value: string): 'ru' | 'en' {
   return value === 'en' ? 'en' : 'ru';
 }
 
-export function toUserDto(row: UserRow): UserDto {
+function encodeKey(key: string): string {
+  return key.split('/').map(encodeURIComponent).join('/');
+}
+
+/** Публичный URL аватара: ключ хранится в БД, путь раздачи задаётся окружением. */
+function avatarUrl(key: string | null, publicPath: string): string | null {
+  return key === null ? null : `${publicPath}/${encodeKey(key)}`;
+}
+
+export function toUserDto(row: UserRow, publicPath = '/media'): UserDto {
   return {
     id: row.id,
     email: row.email,
     displayName: row.display_name,
     phone: row.phone,
     avatarKey: row.avatar_key,
+    avatarUrl: avatarUrl(row.avatar_key, publicPath),
     locale: toLocale(row.locale),
     emailVerified: row.email_verified_at !== null,
     createdAt: row.created_at.toISOString(),
@@ -69,5 +80,9 @@ export const usersService = {
 
   setPasswordHash(executor: DbExecutor, id: string, passwordHash: string): Promise<void> {
     return updatePasswordHash(executor, id, passwordHash);
+  },
+
+  setAvatarKey(executor: DbExecutor, id: string, key: string | null): Promise<UserRow> {
+    return updateAvatarKey(executor, id, key);
   },
 };

@@ -182,7 +182,7 @@ async function login(
   const tokens = await runtime.sessions.issue(user, meta);
   runtime.logger.info({ event: 'auth.login' }, 'login ok');
 
-  return { user: toUserDto(user), tokens };
+  return { user: toUserDto(user, runtime.config.storage.publicPath), tokens };
 }
 
 async function refresh(
@@ -192,13 +192,13 @@ async function refresh(
 ): Promise<LoginResult> {
   if (!rawRefreshToken) throw invalidRefreshToken();
   const result = await runtime.sessions.rotate(rawRefreshToken, meta);
-  return { user: toUserDto(result.user), tokens: result.tokens };
+  return { user: toUserDto(result.user, runtime.config.storage.publicPath), tokens: result.tokens };
 }
 
 async function getMe(runtime: AuthRuntime, userId: string): Promise<UserDto> {
   const user = await usersService.findById(runtime.db.kysely, userId);
   if (!user || !user.is_active || user.deleted_at !== null) throw unauthorized();
-  return toUserDto(user);
+  return toUserDto(user, runtime.config.storage.publicPath);
 }
 
 async function updateMe(
@@ -208,7 +208,7 @@ async function updateMe(
 ): Promise<UserDto> {
   await getMe(runtime, userId);
   const updated = await usersService.updateProfile(runtime.db.kysely, userId, input);
-  return toUserDto(updated);
+  return toUserDto(updated, runtime.config.storage.publicPath);
 }
 
 async function revokeAll(runtime: AuthRuntime, userId: string): Promise<void> {

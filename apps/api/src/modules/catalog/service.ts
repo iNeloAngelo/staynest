@@ -3,6 +3,7 @@ import type {
   CitySuggestionsQuery,
   PublicListing,
   PublicListingsResponse,
+  PublicListingSummary,
   StayPrice,
 } from '@staynest/shared';
 import { calculateStayPrice } from '@staynest/shared';
@@ -20,6 +21,7 @@ import {
   listPublishedListings,
   suggestCities,
 } from './repo';
+import { listPublishedSummariesByIds } from './summaries';
 import type { CatalogPhotoRow, CatalogPriceRuleRow, CatalogRow } from './repo';
 
 export type CatalogServiceDependencies = {
@@ -188,8 +190,30 @@ export function createCatalogService({ db, storage }: CatalogServiceDependencies
       return detail(db.kysely, id, storage);
     },
 
+    /** Карточки для избранного: сохраняем порядок переданных id, архив скрываем. */
+    async summariesByIds(ids: string[]): Promise<PublicListingSummary[]> {
+      const unique = [...new Set(ids)];
+      const rows = await listPublishedSummariesByIds(db.kysely, unique);
+      if (rows.length === 0) return [];
+
+      const photos = await listPhotos(
+        db.kysely,
+        rows.map((row) => row.id),
+      );
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      const photosByListing = groupPhotos(photos);
+
+      return unique.flatMap((id) => {
+        const row = byId.get(id);
+        if (!row) return [];
+        return [toPublicSummary(row, photosByListing.get(id) ?? [], storage)];
+      });
+    },
+
     async cities(query: CitySuggestionsQuery): Promise<string[]> {
       return suggestCities(db.kysely, query.q, query.limit);
     },
   };
 }
+
+export type CatalogService = ReturnType<typeof createCatalogService>;

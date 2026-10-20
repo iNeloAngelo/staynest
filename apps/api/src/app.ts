@@ -11,12 +11,15 @@ import { availabilityRoutes } from './modules/availability/index';
 import { bookingsRoutes } from './modules/bookings/index';
 import type { BookingOptions } from './modules/bookings/index';
 import { catalogRoutes } from './modules/catalog/index';
+import { dashboardRoutes } from './modules/dashboard/index';
+import { favoritesRoutes } from './modules/favorites/index';
 import { healthRoutes } from './modules/health/index';
 import { listingsRoutes } from './modules/listings/index';
 import { notificationsRoutes } from './modules/notifications/index';
 import type { PushSender } from './modules/notifications/index';
 import { photosRoutes } from './modules/photos/index';
 import { pricingRoutes } from './modules/pricing/index';
+import { profileRoutes } from './modules/profile/index';
 import type { AppConfig } from './platform/config/index';
 import type { Db } from './platform/db/index';
 import { createEventBus } from './platform/events/index';
@@ -106,6 +109,9 @@ async function registerModules({
   });
   await app.register(listingsRoutes, { prefix: '/api/v1', config, db, events, storage, logger });
   await app.register(photosRoutes, { prefix: '/api/v1', config, db, storage, logger });
+  await app.register(favoritesRoutes, { prefix: '/api/v1', config, db, storage });
+  await app.register(dashboardRoutes, { prefix: '/api/v1', config, db });
+  await app.register(profileRoutes, { prefix: '/api/v1', config, db, storage, logger });
 }
 
 export async function buildApp({ config, logger, db, ...deps }: AppDependencies) {

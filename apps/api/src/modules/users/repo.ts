@@ -94,3 +94,16 @@ export async function updatePasswordHash(
     .where('id', '=', id)
     .execute();
 }
+
+export async function updateAvatarKey(
+  executor: DbExecutor,
+  id: string,
+  avatarKey: string | null,
+): Promise<UserRow> {
+  return executor
+    .updateTable('users')
+    .set({ avatar_key: avatarKey })
+    .where('id', '=', id)
+    .returningAll()
+    .executeTakeFirstOrThrow();
+}

@@ -13,7 +13,10 @@ import { errorCode } from '../errors/code';
 export type PhotoVariant = 'thumb' | 'md' | 'lg';
 
 export type MediaStorage = {
-  /** Создаёт бакет и публичную политику только на префикс `listings/`. Идемпотентно. */
+  /**
+   * Создаёт бакет и публичную политику только на префиксы `listings/` и `avatars/`.
+   * Идемпотентно.
+   */
   ensureReady: () => Promise<void>;
   put: (key: string, body: Buffer, contentType: string) => Promise<void>;
   remove: (keys: string[]) => Promise<void>;
@@ -35,11 +38,14 @@ function publicReadPolicy(bucket: string): string {
     Version: '2012-10-17',
     Statement: [
       {
-        Sid: 'PublicReadListings',
+        Sid: 'PublicReadMedia',
         Effect: 'Allow',
         Principal: '*',
         Action: ['s3:GetObject'],
-        Resource: [`arn:aws:s3:::${bucket}/listings/*/*/*.webp`],
+        Resource: [
+          `arn:aws:s3:::${bucket}/listings/*/*/*.webp`,
+          `arn:aws:s3:::${bucket}/avatars/*/*.webp`,
+        ],
       },
     ],
   });

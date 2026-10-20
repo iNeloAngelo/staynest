@@ -27,6 +27,17 @@
 		header X-Content-Type-Options "nosniff"
 	}
 
+	handle /media/avatars/* {
+		@notAllowed not method GET HEAD
+		respond @notAllowed 405
+		# Публичная раздача только квадратных WebP-аватаров (политику ставит API).
+		uri strip_prefix /media
+		rewrite * /{$S3_BUCKET:staynest-media}{uri}
+		reverse_proxy silo:9000
+		header Cache-Control "public, max-age=31536000, immutable"
+		header X-Content-Type-Options "nosniff"
+	}
+
 	# SSE требует отключённой буферизации, иначе события копятся в прокси.
 	handle /api/v1/me/events {
 		reverse_proxy api:3100 {

@@ -174,7 +174,11 @@ async function authenticateSession(
   const active = await hasActiveSession(deps.db.kysely, user.id, payload.sid, current);
   if (!active) throw unauthorized();
 
-  return { userId: user.id, sessionId: payload.sid, user: toUserDto(user) };
+  return {
+    userId: user.id,
+    sessionId: payload.sid,
+    user: toUserDto(user, deps.config.storage.publicPath),
+  };
 }
 
 async function listSessionsForUser(
