@@ -37,12 +37,15 @@
     "og:generate": "pnpm --filter @staynest/api og:generate",
     "perf:search": "node scripts/perf-search.mjs",
     "perf:http": "node scripts/perf-http.mjs",
-    "icons:generate": "node scripts/generate-pwa-icons.mjs"
+    "icons:generate": "node scripts/generate-pwa-icons.mjs",
+    "links:check": "node scripts/check-links.mjs README.md docs",
+    "demo:tour": "node scripts/demo-tour.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "~9.39.5",
     "@playwright/test": "^1.64.1",
+    "@vitest/coverage-v8": "^5.0.5",
     "dependency-cruiser": "^18.6.0",
     "eslint": "~9.39.5",
     "eslint-config-prettier": "^10.1.8",
