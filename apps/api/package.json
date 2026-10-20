@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "seed:demo": "node scripts/seed-demo/index.mjs",
+    "seed:demo:clean": "node scripts/seed-demo/index.mjs --clean",
+    "og:generate": "node scripts/generate-og-image.mjs",
     "vapid:generate": "node scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
