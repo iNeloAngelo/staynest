@@ -76,10 +76,11 @@ foreach ($remoteDump in ($stamps -split "`n" | Where-Object { $_ })) {
   }
   if ($siloOk) {
     $siloSha = Assert-Sha256 (Join-Path $target "staynest-silo-$stamp.tar.gz.age") (Join-Path $target "staynest-silo-$stamp.tar.gz.age.sha256")
-    Write-Host "OK: $target (dump $($dumpSha.Substring(0, 12))…, silo $($siloSha.Substring(0, 12))…)"
-  } else {
+    Write-Host "OK: dump $dumpSha silo $siloSha"
+  }
+  if (-not $siloOk) {
     $incomplete += $stamp
-    Write-Warning "Дамп $stamp скачан, но архива бакета нет: копия неполная"
+    Write-Warning "bucket archive missing for $stamp"
   }
 }
 
@@ -93,4 +94,4 @@ Get-ChildItem $Destination -Directory |
   ForEach-Object { Remove-Item -Recurse -Force $_.FullName; Write-Host "Удалена старая копия $($_.Name)" }
 
 Write-Host "Offsite-копия готова: $Destination"
-Write-Host ('Расшифровка: tools\age\age\age.exe -d -i age-identity.txt -o staynest.dump ' + $stamp + '\staynest-' + $stamp + '.dump.age')
+Write-Host "Decryption: see docs/ops.md section 11.2 (age -d -i age-identity.txt)."
