@@ -179,6 +179,7 @@ export interface Listings {
 
 export interface Notifications {
   created_at: Generated<Timestamp>;
+  dedupe_key: string | null;
   id: Generated<string>;
   payload: Generated<Json>;
   read_at: Timestamp | null;

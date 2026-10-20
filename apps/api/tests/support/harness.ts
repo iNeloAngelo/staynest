@@ -15,6 +15,7 @@ import { createLogger } from '../../src/platform/logger/index';
 import type { Mailer } from '../../src/platform/mailer/index';
 import type { MediaStorage } from '../../src/platform/storage/index';
 import type { AuthOptions } from '../../src/modules/auth/index';
+import type { PushSender } from '../../src/modules/notifications/index';
 import { usersService } from '../../src/modules/users/index';
 
 const migrationsDir = fileURLToPath(new URL('../../../../db/migrations', import.meta.url));
@@ -88,8 +89,15 @@ export function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     },
     booking: overrides.booking ?? {
       requestTtlHours: 24,
+      expiryWarningHours: 3,
       maxActivePending: 5,
       rateLimit: { max: 1_000, windowMs: 60_000 },
+    },
+    push: overrides.push ?? {
+      enabled: false,
+      publicKey: null,
+      privateKey: null,
+      subject: 'mailto:test@staynest.local',
     },
   };
 }
@@ -150,6 +158,7 @@ export async function resetTestSchema(url: string): Promise<Client> {
 export async function createHarness(
   overrides: Partial<AppConfig> = {},
   storage?: MediaStorage,
+  push?: PushSender,
 ): Promise<Harness> {
   const config = makeConfig(overrides);
   const logger = createLogger('silent', false);
@@ -163,6 +172,7 @@ export async function createHarness(
     events,
     auth: OPEN_AUTH,
     storage,
+    ...(push ? { push } : {}),
   });
 
   return { app, db, config, events, logger };

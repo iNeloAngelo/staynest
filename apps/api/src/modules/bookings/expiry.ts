@@ -1,6 +1,7 @@
 import type { BookingEventPayload } from '../../platform/events/index';
 import type { DbExecutor } from '../../platform/db/index';
-import { insertBookingEvent, lockExpiredPendingForListing, updateBookingStatus } from './repo';
+import { lockExpiredPendingForListing } from './jobs-repo';
+import { insertBookingEvent, updateBookingStatus } from './repo';
 
 /**
  * Освобождает даты перед новой бронью, если worker отстал: pending с
@@ -34,6 +35,12 @@ export async function expireStaleForListing(
         hostId: row.listing_owner_id,
         status: 'expired',
         occurredAt: now.toISOString(),
+        listingTitle: row.listing_title,
+        checkIn: row.check_in ?? '',
+        checkOut: row.check_out ?? '',
+        guestName: row.guest_display_name,
+        totalMinor: Number(row.total_minor),
+        currency: row.currency.trim(),
       });
     }
 

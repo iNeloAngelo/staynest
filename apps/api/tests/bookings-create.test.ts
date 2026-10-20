@@ -466,6 +466,7 @@ describeDatabase('создание брони', () => {
     const limited = await createHarness({
       booking: {
         requestTtlHours: 24,
+        expiryWarningHours: 3,
         maxActivePending: 5,
         rateLimit: { max: 2, windowMs: 60_000 },
       },

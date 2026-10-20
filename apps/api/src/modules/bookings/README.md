@@ -67,6 +67,7 @@ pending ──confirm──▶ confirmed ──check_out──▶ completed
 |---|---|---|
 | `bookings.expire-pending` | каждую минуту | `pending` с `expires_at <= now()` → `expired` |
 | `bookings.complete-past` | 00:15 по `LISTING_TIME_ZONE` | `confirmed` с `check_out < today` → `completed` |
+| `bookings.expiring-soon` | каждые 10 минут | публикует `booking.expiring_soon` для заявок, истекающих в ближайшие 3 часа |
 | `bookings.cleanup-idempotency` | 03:30 | удаляет `idempotency_keys` старше 48 часов |
 
 Задачи берут строки `FOR UPDATE SKIP LOCKED`, поэтому confirm/decline не

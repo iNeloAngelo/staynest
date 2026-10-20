@@ -73,9 +73,19 @@ const envSchema = z.object({
   PHOTO_MAX_PIXELS: z.coerce.number().int().min(1_000_000).max(40_000_000).default(32_000_000),
 
   BOOKING_REQUEST_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+  BOOKING_EXPIRY_WARNING_HOURS: z.coerce.number().int().min(1).max(24).default(3),
   BOOKING_MAX_ACTIVE_PENDING: z.coerce.number().int().min(1).max(50).default(5),
   BOOKING_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000).default(10),
   BOOKING_RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(1_440).default(10),
+
+  /** Web Push: VAPID-пара генерируется `pnpm vapid:generate` и живёт только в .env. */
+  VAPID_PUBLIC_KEY: z.string().trim().optional(),
+  VAPID_PRIVATE_KEY: z.string().trim().optional(),
+  VAPID_SUBJECT: z
+    .string()
+    .trim()
+    .regex(/^(mailto:|https:\/\/)/, 'VAPID_SUBJECT: mailto: или https://')
+    .default('mailto:no-reply@staynest.local'),
 });
 
 type LogLevel = z.infer<typeof logLevelSchema>;
@@ -115,9 +125,18 @@ export type StorageConfig = {
   maxPixels: number;
 };
 
+export type PushConfig = {
+  enabled: boolean;
+  publicKey: string | null;
+  privateKey: string | null;
+  subject: string;
+};
+
 type BookingConfig = {
   /** Срок ответа хозяина на заявку. */
   requestTtlHours: number;
+  /** За сколько часов до истечения напоминать хозяину. */
+  expiryWarningHours: number;
   /** Максимум активных (pending) заявок одного гостя. */
   maxActivePending: number;
   rateLimit: {
@@ -141,6 +160,7 @@ export type AppConfig = {
   mail: MailConfig;
   storage: StorageConfig;
   booking: BookingConfig;
+  push: PushConfig;
 };
 
 function loadDotEnvFiles(): void {
@@ -164,11 +184,28 @@ function optionalSecret(value: string | undefined): string | undefined {
 function bookingConfig(data: EnvData): BookingConfig {
   return {
     requestTtlHours: data.BOOKING_REQUEST_TTL_HOURS,
+    expiryWarningHours: data.BOOKING_EXPIRY_WARNING_HOURS,
     maxActivePending: data.BOOKING_MAX_ACTIVE_PENDING,
     rateLimit: {
       max: data.BOOKING_RATE_LIMIT_MAX,
       windowMs: data.BOOKING_RATE_LIMIT_WINDOW_MINUTES * 60_000,
     },
+  };
+}
+
+function pushConfig(data: EnvData): PushConfig {
+  const publicKey = data.VAPID_PUBLIC_KEY || null;
+  const privateKey = data.VAPID_PRIVATE_KEY || null;
+
+  if ((publicKey === null) !== (privateKey === null)) {
+    throw new Error('VAPID_PUBLIC_KEY и VAPID_PRIVATE_KEY задаются только вместе.');
+  }
+
+  return {
+    enabled: publicKey !== null && privateKey !== null,
+    publicKey,
+    privateKey,
+    subject: data.VAPID_SUBJECT,
   };
 }
 
@@ -224,6 +261,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const data = parsed.data;
   assertProductionConfig(env, data);
 
+  return appConfigFrom(data, env);
+}
+
+function appConfigFrom(data: EnvData, env: NodeJS.ProcessEnv): AppConfig {
   return {
     nodeEnv: data.NODE_ENV,
     host: data.API_HOST,
@@ -271,5 +312,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       maxPixels: data.PHOTO_MAX_PIXELS,
     },
     booking: bookingConfig(data),
+    push: pushConfig(data),
   };
 }

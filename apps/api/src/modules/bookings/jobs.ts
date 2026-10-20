@@ -6,13 +6,9 @@ import type { Db } from '../../platform/db/index';
 import type { EventBus } from '../../platform/events/index';
 import type { BookingEventPayload } from '../../platform/events/index';
 import { deleteIdempotencyOlderThan } from './idempotency';
-import {
-  insertBookingEvent,
-  lockConfirmedToComplete,
-  lockExpiredPending,
-  updateBookingStatus,
-} from './repo';
-import type { JobBookingRow } from './repo';
+import { listPendingExpiring, lockConfirmedToComplete, lockExpiredPending } from './jobs-repo';
+import type { JobBookingRow } from './jobs-repo';
+import { insertBookingEvent, updateBookingStatus } from './repo';
 
 const JOB_BATCH_SIZE = 100;
 const MAX_BATCHES = 10;
@@ -38,6 +34,13 @@ function payloadOf(
     hostId: row.listing_owner_id,
     status,
     occurredAt,
+    listingTitle: row.listing_title,
+    checkIn: row.check_in ?? '',
+    checkOut: row.check_out ?? '',
+    guestName: row.guest_display_name,
+    totalMinor: Number(row.total_minor),
+    currency: row.currency.trim(),
+    ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
   };
 }
 
@@ -117,6 +120,19 @@ export function createBookingJobs(dependencies: BookingJobsDependencies) {
 
       if (total > 0) logger.info({ count: total }, 'bookings completed');
       return total;
+    },
+
+    /** Заявки, которые истекут в ближайшие часы: напоминание хозяину. */
+    async expiringSoon(at: Date = now()): Promise<number> {
+      const to = new Date(at.getTime() + config.booking.expiryWarningHours * 3_600_000);
+      const rows = await listPendingExpiring(db.kysely, at, to, JOB_BATCH_SIZE * 5);
+
+      for (const row of rows) {
+        events.publish('booking.expiring_soon', payloadOf(row, 'pending', at.toISOString()));
+      }
+
+      if (rows.length > 0) logger.info({ count: rows.length }, 'expiring bookings announced');
+      return rows.length;
     },
 
     /** Ключи идемпотентности живут 48 часов: дольше повторять запрос смысла нет. */

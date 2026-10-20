@@ -4,6 +4,7 @@ export * from './catalog';
 export * from './dates';
 export * from './health';
 export * from './listings';
+export * from './notifications';
 export * from './photos';
 export * from './pricing';
 export * from './stay-price';

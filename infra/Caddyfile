@@ -1,5 +1,7 @@
 {$DOMAIN} {
-	encode zstd gzip
+	# SSE нельзя сжимать: gzip/zstd буферизует кадры и ломает реальное время.
+	@notEvents not path /api/v1/me/events
+	encode @notEvents zstd gzip
 
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -23,6 +25,13 @@
 		reverse_proxy silo:9000
 		header Cache-Control "public, max-age=31536000, immutable"
 		header X-Content-Type-Options "nosniff"
+	}
+
+	# SSE требует отключённой буферизации, иначе события копятся в прокси.
+	handle /api/v1/me/events {
+		reverse_proxy api:3100 {
+			flush_interval -1
+		}
 	}
 
 	handle /api/* {

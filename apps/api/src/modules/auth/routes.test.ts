@@ -88,8 +88,15 @@ function makeConfig(): AppConfig {
     },
     booking: {
       requestTtlHours: 24,
+      expiryWarningHours: 3,
       maxActivePending: 5,
       rateLimit: { max: 1_000, windowMs: 60_000 },
+    },
+    push: {
+      enabled: false,
+      publicKey: null,
+      privateKey: null,
+      subject: 'mailto:test@staynest.local',
     },
   };
 }

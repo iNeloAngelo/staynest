@@ -13,6 +13,8 @@ import type { BookingOptions } from './modules/bookings/index';
 import { catalogRoutes } from './modules/catalog/index';
 import { healthRoutes } from './modules/health/index';
 import { listingsRoutes } from './modules/listings/index';
+import { notificationsRoutes } from './modules/notifications/index';
+import type { PushSender } from './modules/notifications/index';
 import { photosRoutes } from './modules/photos/index';
 import { pricingRoutes } from './modules/pricing/index';
 import type { AppConfig } from './platform/config/index';
@@ -35,6 +37,7 @@ export type AppDependencies = {
   auth?: AuthOptions;
   booking?: BookingOptions;
   storage?: MediaStorage;
+  push?: PushSender;
 };
 
 const HELMET_OPTIONS = {
@@ -64,6 +67,7 @@ type ModuleDeps = {
   storage: MediaStorage;
   auth?: AuthOptions;
   booking?: BookingOptions;
+  push?: PushSender;
 };
 
 async function registerModules({
@@ -76,6 +80,7 @@ async function registerModules({
   storage,
   auth,
   booking,
+  push,
 }: ModuleDeps) {
   await app.register(healthRoutes, { prefix: '/api/v1', db });
   await app.register(authRoutes, {
@@ -91,6 +96,14 @@ async function registerModules({
   await app.register(availabilityRoutes, { prefix: '/api/v1', db, config });
   await app.register(pricingRoutes, { prefix: '/api/v1', db, config });
   await app.register(bookingsRoutes, { prefix: '/api/v1', config, db, events, booking });
+  await app.register(notificationsRoutes, {
+    prefix: '/api/v1',
+    config,
+    db,
+    logger,
+    events,
+    push,
+  });
   await app.register(listingsRoutes, { prefix: '/api/v1', config, db, events, storage, logger });
   await app.register(photosRoutes, { prefix: '/api/v1', config, db, storage, logger });
 }
@@ -143,6 +156,7 @@ export async function buildApp({ config, logger, db, ...deps }: AppDependencies)
     storage,
     auth: deps.auth,
     booking: deps.booking,
+    push: deps.push,
   });
 
   return app;

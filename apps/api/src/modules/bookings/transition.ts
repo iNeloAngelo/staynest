@@ -130,6 +130,13 @@ async function expireIfStale(context: ExpireContext): Promise<TransitionOutcome 
       hostId: row.listing_owner_id,
       status: 'expired',
       occurredAt: now.toISOString(),
+      listingTitle: row.listing_title,
+      checkIn: row.check_in ?? '',
+      checkOut: row.check_out ?? '',
+      guestName: row.guest_display_name,
+      totalMinor: Number(row.total_minor),
+      currency: row.currency.trim(),
+      ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
     },
   };
 }
@@ -192,6 +199,13 @@ async function applyOnLockedRow(context: ApplyContext): Promise<TransitionOutcom
       hostId: row.listing_owner_id,
       status: target,
       occurredAt: now.toISOString(),
+      listingTitle: row.listing_title,
+      checkIn: row.check_in ?? '',
+      checkOut: row.check_out ?? '',
+      guestName: row.guest_display_name,
+      totalMinor: Number(row.total_minor),
+      currency: row.currency.trim(),
+      ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
     },
     action,
   };

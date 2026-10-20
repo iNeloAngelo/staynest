@@ -29,6 +29,7 @@
     "db:reset": "node scripts/db-reset.mjs",
     "db:reset:test": "node scripts/db-reset.mjs --test",
     "db:codegen": "node scripts/db-codegen.mjs",
+    "vapid:generate": "pnpm --filter @staynest/api vapid:generate",
     "seed:perf": "node scripts/seed-perf.mjs",
     "perf:search": "node scripts/perf-search.mjs",
     "perf:http": "node scripts/perf-http.mjs",

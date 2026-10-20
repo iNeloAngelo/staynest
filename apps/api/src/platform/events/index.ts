@@ -10,6 +10,15 @@ export type BookingEventPayload = {
   hostId: string;
   status: BookingStatus;
   occurredAt: string;
+  /** Данные для уведомлений: пишутся в событие, чтобы notifications не читал чужие таблицы. */
+  listingTitle: string;
+  checkIn: string;
+  checkOut: string;
+  guestName: string;
+  totalMinor: number;
+  currency: string;
+  /** Для напоминания «заявка скоро истечёт». */
+  expiresAt?: string;
 };
 
 type AppEventMap = {
@@ -28,6 +37,7 @@ type AppEventMap = {
   'booking.declined': BookingEventPayload;
   'booking.cancelled': BookingEventPayload & { actorId: string };
   'booking.expired': BookingEventPayload;
+  'booking.expiring_soon': BookingEventPayload;
   'booking.completed': BookingEventPayload;
 };
 

@@ -108,4 +108,28 @@ describe('loadConfig', () => {
       }),
     ).toThrow(/LOG_LEVEL/);
   });
+
+  it('включает push только при полной паре VAPID и разбирает окно напоминания', () => {
+    const disabled = loadConfig({ ...baseEnv, NODE_ENV: 'test' });
+    expect(disabled.push).toMatchObject({ enabled: false, publicKey: null });
+    expect(disabled.booking.expiryWarningHours).toBe(3);
+
+    const enabled = loadConfig({
+      ...baseEnv,
+      NODE_ENV: 'test',
+      VAPID_PUBLIC_KEY: 'public-key',
+      VAPID_PRIVATE_KEY: 'private-key',
+      BOOKING_EXPIRY_WARNING_HOURS: '5',
+    });
+    expect(enabled.push).toMatchObject({
+      enabled: true,
+      publicKey: 'public-key',
+      privateKey: 'private-key',
+    });
+    expect(enabled.booking.expiryWarningHours).toBe(5);
+
+    expect(() =>
+      loadConfig({ ...baseEnv, NODE_ENV: 'test', VAPID_PUBLIC_KEY: 'public-key' }),
+    ).toThrow(/VAPID/);
+  });
 });

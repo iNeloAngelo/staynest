@@ -21,11 +21,10 @@ export type BookingDetailRow = BookingRow & {
 
 export type GuestRow = {
   id: string;
+  display_name: string;
   is_active: boolean;
   email_verified_at: Date | null;
 };
-
-export type JobBookingRow = BookingRow & { listing_owner_id: string };
 
 function createdAtPrecise() {
   return sql<string>`to_char(bookings.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
@@ -58,7 +57,7 @@ function detailQuery(executor: DbExecutor) {
 export function lockGuest(executor: DbExecutor, userId: string): Promise<GuestRow | undefined> {
   return executor
     .selectFrom('users')
-    .select(['id', 'is_active', 'email_verified_at'])
+    .select(['id', 'display_name', 'is_active', 'email_verified_at'])
     .where('id', '=', userId)
     .forUpdate()
     .executeTakeFirst();
@@ -241,66 +240,4 @@ export function listBookingEvents(
     .where('booking_id', '=', bookingId)
     .orderBy('id', 'asc')
     .execute() as Promise<BookingEventRow[]>;
-}
-
-/** Истёкшие заявки конкретного объявления: вызывается под его FOR UPDATE. */
-export function lockExpiredPendingForListing(
-  executor: DbExecutor,
-  listingId: string,
-  now: Date,
-): Promise<JobBookingRow[]> {
-  return executor
-    .selectFrom('bookings')
-    .innerJoin('listings', 'listings.id', 'bookings.listing_id')
-    .selectAll('bookings')
-    .select('listings.owner_id as listing_owner_id')
-    .where('bookings.listing_id', '=', listingId)
-    .where('bookings.status', '=', 'pending')
-    .where('bookings.expires_at', 'is not', null)
-    .where('bookings.expires_at', '<=', now)
-    .orderBy('bookings.expires_at', 'asc')
-    .limit(100)
-    .forUpdate('bookings')
-    .execute() as Promise<JobBookingRow[]>;
-}
-
-/** Истёкшие заявки: строки блокируются, параллельный confirm их пропустит. */
-export function lockExpiredPending(
-  executor: DbExecutor,
-  now: Date,
-  limit: number,
-): Promise<JobBookingRow[]> {
-  return executor
-    .selectFrom('bookings')
-    .innerJoin('listings', 'listings.id', 'bookings.listing_id')
-    .selectAll('bookings')
-    .select('listings.owner_id as listing_owner_id')
-    .where('bookings.status', '=', 'pending')
-    .where('bookings.expires_at', 'is not', null)
-    .where('bookings.expires_at', '<=', now)
-    .orderBy('bookings.expires_at', 'asc')
-    .limit(limit)
-    .forUpdate('bookings')
-    .skipLocked()
-    .execute() as Promise<JobBookingRow[]>;
-}
-
-/** Подтверждённые брони, у которых дата выезда уже прошла. */
-export function lockConfirmedToComplete(
-  executor: DbExecutor,
-  today: string,
-  limit: number,
-): Promise<JobBookingRow[]> {
-  return executor
-    .selectFrom('bookings')
-    .innerJoin('listings', 'listings.id', 'bookings.listing_id')
-    .selectAll('bookings')
-    .select('listings.owner_id as listing_owner_id')
-    .where('bookings.status', '=', 'confirmed')
-    .where('bookings.check_out', '<', today)
-    .orderBy('bookings.check_out', 'asc')
-    .limit(limit)
-    .forUpdate('bookings')
-    .skipLocked()
-    .execute() as Promise<JobBookingRow[]>;
 }

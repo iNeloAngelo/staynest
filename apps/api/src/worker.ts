@@ -1,4 +1,5 @@
 import { createBookingJobs } from './modules/bookings/index';
+import { createNotificationService } from './modules/notifications/index';
 import { loadConfig } from './platform/config/index';
 import { createDb } from './platform/db/index';
 import { errorCode } from './platform/errors/code';
@@ -13,6 +14,7 @@ const logger = createLogger(config.logLevel, config.nodeEnv === 'development');
 const db = createDb(config.databaseUrl, logger, config.dbQueryTimeoutMs);
 const events = createEventBus(logger);
 const bookingJobs = createBookingJobs({ db, config, events, logger });
+const notifications = createNotificationService({ db, config, logger, events });
 
 const runner = await startJobRunner({
   connectionString: config.databaseUrl,
@@ -30,6 +32,11 @@ const runner = await startJobRunner({
       run: () => bookingJobs.completePast(),
     },
     {
+      name: 'bookings.expiring-soon',
+      cron: '*/10 * * * *',
+      run: () => bookingJobs.expiringSoon(),
+    },
+    {
       name: 'bookings.cleanup-idempotency',
       cron: '30 3 * * *',
       run: () => bookingJobs.cleanupIdempotency(),
@@ -37,7 +44,7 @@ const runner = await startJobRunner({
   ],
 });
 
-logger.info({ jobs: 3 }, 'worker started');
+logger.info({ jobs: 4 }, 'worker started');
 
 let shuttingDown = false;
 
@@ -60,6 +67,8 @@ async function shutdown(signal: string): Promise<void> {
     exitCode = 1;
     logger.error({ code: errorCode(error) }, 'job runner stop failed');
   }
+
+  notifications.close();
 
   try {
     await db.close();

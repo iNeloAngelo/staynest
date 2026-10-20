@@ -191,6 +191,13 @@ async function createInTransaction(
       hostId: listing.ownerId,
       status: 'pending' as const,
       occurredAt: context.now.toISOString(),
+      listingTitle: listing.title,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      guestName: guest?.display_name ?? '',
+      totalMinor: quote.quote.totalMinor,
+      currency: quote.quote.currency,
+      expiresAt: context.expiresAt.toISOString(),
     },
     expiredEvents,
   };
