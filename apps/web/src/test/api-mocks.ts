@@ -335,6 +335,8 @@ export type ApiMockOptions = {
   unreadCount?: number;
   pushEnabled?: boolean;
   favoriteIds?: string[];
+  favoriteStatus?: number;
+  profileStatus?: number;
   dashboard?: DashboardResponse;
   bookingCreateStatus?: number;
   bookingCreateBody?: unknown;
@@ -368,6 +370,10 @@ function profileRoute({ url, method, init, options }: RouteContext): Response | 
   const base = options.user ?? demoUser;
 
   if (method === 'PATCH' && url.endsWith('/me')) {
+    if (options.profileStatus && options.profileStatus >= 400) {
+      return jsonResponse({ code: 'validation_error' }, options.profileStatus);
+    }
+
     const patch = JSON.parse((init?.body as string | undefined) ?? '{}') as Partial<UserDto>;
     return jsonResponse({ user: { ...base, ...patch } });
   }
@@ -390,10 +396,11 @@ function profileRoute({ url, method, init, options }: RouteContext): Response | 
   return null;
 }
 
-function authRoute({ url, options }: RouteContext): Response | null {
+function authRoute({ url, method, options }: RouteContext): Response | null {
   const user = options.user ?? null;
 
-  if (url.endsWith('/auth/refresh') || url.endsWith('/me')) return sessionResponse(user);
+  if (url.endsWith('/auth/refresh')) return sessionResponse(user);
+  if (method === 'GET' && url.endsWith('/me')) return sessionResponse(user);
 
   if (url.endsWith('/auth/login')) {
     return jsonResponse(options.loginBody ?? { user: demoUser }, options.loginStatus ?? 200);
@@ -652,6 +659,7 @@ function notificationsRoute({ url, method, options }: RouteContext): Response | 
   return null;
 }
 
+// eslint-disable-next-line complexity -- тестовый мини-API, ветки по методам.
 function favoritesRoute(
   { url, method, options }: RouteContext,
   favoriteIds: Set<string>,
@@ -662,6 +670,9 @@ function favoritesRoute(
 
   const match = /\/me\/favorites\/([^/?]+)/.exec(url);
   if (match?.[1] && method === 'PUT') {
+    if (options.favoriteStatus && options.favoriteStatus >= 400) {
+      return jsonResponse({ code: 'server_error' }, options.favoriteStatus);
+    }
     favoriteIds.add(match[1]);
     return jsonResponse({ listingId: match[1], favorite: true });
   }

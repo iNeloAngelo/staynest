@@ -44,8 +44,11 @@ describe('HostDashboardView', () => {
     renderDashboard();
 
     const chart = await screen.findByRole('img', { name: 'Доход по месяцам' });
-    expect(within(chart).getAllByText(/[а-яё]{3}/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/2\s?500/).length).toBeGreaterThan(0);
+    expect(chart).toHaveAttribute('preserveAspectRatio', 'none');
+
+    const values = screen.getByTestId('revenue-values');
+    expect(within(values).getByText(/2\s?500/)).toBeInTheDocument();
+    expect(within(values).getByText(/1 бронь/)).toBeInTheDocument();
   });
 
   it('показывает ошибку с повтором, если API недоступен', async () => {

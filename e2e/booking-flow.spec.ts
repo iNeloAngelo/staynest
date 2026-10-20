@@ -114,15 +114,38 @@ async function createPublishedListing(request: APIRequestContext): Promise<strin
 }
 
 async function checkFavorites(page: Page, listingId: string): Promise<void> {
+  const addDone = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/me/favorites/${listingId}`) &&
+      response.request().method() === 'PUT',
+  );
   await page.getByRole('button', { name: 'Добавить в избранное' }).click();
+  await addDone;
   await expect(page.getByRole('button', { name: 'Убрать из избранного' })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
+
   await page.goto('/favorites');
   await expect(page.getByRole('heading', { name: 'Избранное', level: 1 })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Дом у озера для e2e' })).toBeVisible();
+
+  // Синхронизация в обратную сторону: карточка каталога и карточка дома.
+  await page.goto('/');
+  const card = page.getByRole('link', { name: /Дом у озера для e2e/ }).locator('..');
+  const remove = card.getByRole('button', { name: 'Убрать из избранного' });
+  await expect(remove).toBeVisible();
+
+  const removeDone = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/me/favorites/${listingId}`) &&
+      response.request().method() === 'DELETE',
+  );
+  await remove.click();
+  await removeDone;
+
   await page.goto(`/listings/${listingId}`);
+  await expect(page.getByRole('button', { name: 'Добавить в избранное' })).toBeVisible();
 }
 
 test('хозяин публикует дом, гость бронирует, хозяин подтверждает, гость видит статус', async ({

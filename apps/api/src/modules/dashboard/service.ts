@@ -8,6 +8,7 @@ import {
 import type { AppConfig } from '../../platform/config/index';
 import type { Db } from '../../platform/db/index';
 import {
+  countHostListings,
   countPendingRequests,
   listUpcomingCheckIns,
   revenueByMonth,
@@ -71,8 +72,9 @@ export function createDashboardService({
       const monthKeys = recentMonthKeys(today, query.months);
       const fromMonth = monthKeys[0] ?? today.slice(0, 7);
 
-      const [pendingRequests, upcoming, bookedNights, blockedNights, revenueRows] =
+      const [homes, pendingRequests, upcoming, bookedNights, blockedNights, revenueRows] =
         await Promise.all([
+          countHostListings(db.kysely, ownerId),
           countPendingRequests(db.kysely, ownerId),
           listUpcomingCheckIns(db.kysely, ownerId, {
             from: today,
@@ -85,6 +87,8 @@ export function createDashboardService({
         ]);
 
       const occupiedNights = bookedNights + blockedNights;
+      // Занятость — доля занятых ночей от всех ночей всех опубликованных домов.
+      const totalNights = DASHBOARD_OCCUPANCY_DAYS * Math.max(1, homes);
 
       return {
         today,
@@ -102,11 +106,11 @@ export function createDashboardService({
         occupancy: {
           from: today,
           to: windowTo,
-          totalNights: DASHBOARD_OCCUPANCY_DAYS,
+          totalNights,
           bookedNights,
           blockedNights,
           occupiedNights,
-          percent: Math.min(100, Math.round((occupiedNights / DASHBOARD_OCCUPANCY_DAYS) * 100)),
+          percent: Math.min(100, Math.round((occupiedNights / totalNights) * 100)),
         },
         revenue: fillMonths(monthKeys, revenueRows),
       };

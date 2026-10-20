@@ -24,10 +24,10 @@ export function UpcomingCheckIns({ checkIns }: { checkIns: DashboardCheckIn[] })
             <li key={checkIn.bookingId}>
               <Link
                 to={`/bookings/${checkIn.bookingId}`}
-                className="flex flex-wrap items-baseline justify-between gap-2 py-3 transition-colors duration-micro hover:text-primary"
+                className="group flex flex-wrap items-baseline justify-between gap-2 py-3"
               >
                 <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate text-body font-medium text-ink">
+                  <span className="truncate text-body font-medium text-ink group-hover:text-primary">
                     {checkIn.listingTitle}
                   </span>
                   <span className="text-small text-ink-muted">

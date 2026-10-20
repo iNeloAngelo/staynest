@@ -6,8 +6,12 @@ import { useNavigate } from 'react-router-dom';
 import { authErrorKey, useLogout, useMe } from '../../features/auth';
 import { ModeSwitchControl } from '../../features/mode-switch';
 import { PushToggle, detachCurrentDevicePush } from '../../features/notifications';
-import { PasswordCard, ProfileAvatar, ProfileForm, useUpdateProfile } from '../../features/profile';
-import { useLocale } from '../../shared/i18n';
+import {
+  PasswordCard,
+  ProfileAvatar,
+  ProfileForm,
+  useLocalePreference,
+} from '../../features/profile';
 import { Badge, Button, Select, useToast } from '../../shared/ui';
 
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
@@ -42,32 +46,20 @@ function AccountCard({ user }: { user: UserDto }) {
 
 function SettingsCard() {
   const { t } = useTranslation();
-  const { locale, setLocale } = useLocale();
-  const { data: user } = useMe();
-  const update = useUpdateProfile();
-  const toast = useToast();
-
-  async function onLanguage(value: string): Promise<void> {
-    const next = value === 'en' ? 'en' : 'ru';
-    setLocale(next);
-    if (!user) return;
-
-    try {
-      await update.mutateAsync({ locale: next });
-    } catch {
-      toast.show({ title: t('profile.saveError'), tone: 'error' });
-    }
-  }
+  const { locale, changeLocale, pending } = useLocalePreference();
 
   return (
     <section className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6">
+      <h2 className="font-serif text-h3 text-ink">{t('profile.settingsTitle')}</h2>
+
       <Select
         label={t('profile.language')}
         value={locale}
-        onChange={(event) => void onLanguage(event.target.value)}
+        disabled={pending}
+        onChange={(event) => void changeLocale(event.target.value === 'en' ? 'en' : 'ru')}
         options={[
-          { value: 'ru', label: 'Русский' },
-          { value: 'en', label: 'English' },
+          { value: 'ru', label: t('profile.languageRu') },
+          { value: 'en', label: t('profile.languageEn') },
         ]}
       />
 
@@ -100,7 +92,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header>
         <h1 className="text-h1 text-ink">{t('profile.title')}</h1>
         <p className="mt-1 text-small text-ink-muted">{t('profile.subtitle')}</p>
@@ -128,6 +120,7 @@ export function ProfilePage() {
 
         <Button
           variant="danger"
+          className="w-fit"
           leftIcon={<LogOut className="size-5" aria-hidden="true" />}
           onClick={() => void onLogout()}
           loading={logout.isPending}

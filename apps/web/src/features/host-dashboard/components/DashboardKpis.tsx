@@ -22,7 +22,7 @@ function KpiCard({
     <article className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm">
       <div className="flex items-center gap-2 text-ink-muted">
         {icon}
-        <h2 className="text-small font-medium">{label}</h2>
+        <h2 className="font-sans text-small font-medium">{label}</h2>
       </div>
       <p className="font-serif text-h2 text-ink tabular-nums">{value}</p>
       {hint ? <p className="text-caption text-ink-muted">{hint}</p> : null}
@@ -35,7 +35,9 @@ function OccupancyCard({ occupancy }: { occupancy: DashboardResponse['occupancy'
 
   return (
     <article className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm">
-      <h2 className="text-small font-medium text-ink-muted">{t('hostDashboard.occupancy')}</h2>
+      <h2 className="font-sans text-small font-medium text-ink-muted">
+        {t('hostDashboard.occupancy')}
+      </h2>
       <p className="font-serif text-h2 text-ink tabular-nums">{occupancy.percent}%</p>
 
       <div
@@ -47,8 +49,8 @@ function OccupancyCard({ occupancy }: { occupancy: DashboardResponse['occupancy'
         className="h-2 overflow-hidden rounded-full bg-surface-2"
       >
         <div
-          className="h-full rounded-full bg-primary transition-[width] duration-panel"
-          style={{ width: `${occupancy.percent}%` }}
+          className="h-full w-full origin-left rounded-full bg-primary transition-transform duration-panel"
+          style={{ transform: `scaleX(${occupancy.percent / 100})` }}
         />
       </div>
 

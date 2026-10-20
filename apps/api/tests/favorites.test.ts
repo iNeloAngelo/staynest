@@ -142,6 +142,28 @@ describeDatabase('избранное', () => {
     expect((await favoriteList(h, guest)).listings).toHaveLength(0);
   });
 
+  it('архивные дома не занимают страницу и не оставляют пустой курсор', async () => {
+    const archivedIds: string[] = [];
+    for (let index = 0; index < 2; index += 1) {
+      const id = await seedListing(h, owner.id);
+      archivedIds.push(id);
+      await putFavorite(h, guest, id);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    const publishedId = await seedListing(h, owner.id);
+    await putFavorite(h, guest, publishedId);
+
+    await h.db.kysely
+      .updateTable('listings')
+      .set({ status: 'archived' })
+      .where('id', 'in', archivedIds)
+      .execute();
+
+    const page = await favoriteList(h, guest, '?limit=2');
+    expect(page.listings.map((listing) => listing.id)).toEqual([publishedId]);
+    expect(page.nextCursor).toBeNull();
+  });
+
   it('пагинация по курсору не теряет и не дублирует дома', async () => {
     const ids: string[] = [];
     for (let index = 0; index < 3; index += 1) {

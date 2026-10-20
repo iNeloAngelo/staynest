@@ -78,8 +78,12 @@ describeDatabase('профиль и аватар', () => {
     await client?.end();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     media.objects.clear();
+    await client.query(
+      `UPDATE users SET avatar_key = NULL, display_name = 'Анна', phone = NULL, locale = 'ru' WHERE id = $1`,
+      [user.id],
+    );
   });
 
   async function upload(data: Buffer, field?: string) {
@@ -113,6 +117,15 @@ describeDatabase('профиль и аватар', () => {
 
   it('не принимает файл, который только притворяется картинкой', async () => {
     const response = await upload(Buffer.from('MZ not an image at all'), 'avatar');
+
+    expect(response.statusCode).toBe(415);
+    expect(response.json()).toMatchObject({ code: 'avatar_unsupported' });
+    expect(media.objects.size).toBe(0);
+  });
+
+  it('отклоняет битую картинку с валидной сигнатурой', async () => {
+    const truncated = (await image()).subarray(0, 100);
+    const response = await upload(truncated);
 
     expect(response.statusCode).toBe(415);
     expect(response.json()).toMatchObject({ code: 'avatar_unsupported' });

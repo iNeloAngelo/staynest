@@ -14,9 +14,19 @@ export function ProfileLink({ user }: { user: UserDto }) {
     <Link
       to="/profile"
       aria-label={t('header.profileOf', { name: user.displayName })}
-      className="flex size-11 items-center justify-center rounded-full bg-primary text-body font-semibold text-on-primary"
+      className="flex size-11 items-center justify-center overflow-hidden rounded-full bg-primary text-body font-semibold text-on-primary"
     >
-      {initials(user.displayName)}
+      {user.avatarUrl ? (
+        <img
+          src={user.avatarUrl}
+          alt=""
+          width={44}
+          height={44}
+          className="size-full object-cover"
+        />
+      ) : (
+        initials(user.displayName)
+      )}
     </Link>
   );
 }

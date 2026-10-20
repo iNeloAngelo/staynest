@@ -22,9 +22,11 @@ export function listFavorites(
 ): Promise<FavoriteRow[]> {
   let query = executor
     .selectFrom('favorites')
+    .innerJoin('listings', 'listings.id', 'favorites.listing_id')
     .select('favorites.listing_id')
     .select(preciseCreatedAt().as('created_at_precise'))
-    .where('favorites.user_id', '=', userId);
+    .where('favorites.user_id', '=', userId)
+    .where('listings.status', '=', 'published');
 
   if (cursor) {
     query = query.where(

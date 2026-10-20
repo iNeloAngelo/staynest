@@ -1,18 +1,24 @@
+import type { UserDto } from '@staynest/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '../../../shared/api';
 import { ToastProvider } from '../../../shared/ui';
 import { demoPublicListing, demoUser, mockApi } from '../../../test/api-mocks';
 import { FavoriteButton } from './FavoriteButton';
 
-function renderPair() {
+function newClient(user: UserDto | null = demoUser) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  queryClient.setQueryData(queryKeys.me, demoUser);
+  queryClient.setQueryData(queryKeys.me, user);
+  return queryClient;
+}
+
+function renderPair(user = demoUser) {
+  const queryClient = newClient(user);
 
   const view = render(
     <QueryClientProvider client={queryClient}>
@@ -26,6 +32,23 @@ function renderPair() {
   );
 
   return { ...view, queryClient };
+}
+
+function renderAnonymous() {
+  const queryClient = newClient(null);
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/listings/abc']}>
+          <Routes>
+            <Route path="/login" element={<h1>Вход</h1>} />
+            <Route path="*" element={<FavoriteButton listingId={demoPublicListing.id} />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
 }
 
 describe('FavoriteButton', () => {
@@ -61,6 +84,59 @@ describe('FavoriteButton', () => {
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: 'Добавить в избранное' })).toHaveLength(2);
     });
+  });
+
+  it('переключает состояние до ответа сервера (оптимистично)', async () => {
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetchMock = mockApi({ user: demoUser, favoriteIds: [] });
+    const implementation = fetchMock.getMockImplementation() as
+      ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) | undefined;
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const method = (init as RequestInit | undefined)?.method;
+      if (String(input).includes('/me/favorites/') && method === 'PUT') await gate;
+      return implementation?.(input, init) ?? new Response(null, { status: 500 });
+    });
+
+    const user = userEvent.setup();
+    renderPair();
+
+    const add = await screen.findAllByRole('button', { name: 'Добавить в избранное' });
+    await user.click(add[0]!);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Убрать из избранного' })).toHaveLength(2);
+    });
+
+    release();
+  });
+
+  it('откатывает сердечко и показывает тост при ошибке', async () => {
+    mockApi({ user: demoUser, favoriteIds: [], favoriteStatus: 500 });
+    const user = userEvent.setup();
+    renderPair();
+
+    await user.click((await screen.findAllByRole('button', { name: 'Добавить в избранное' }))[0]!);
+
+    expect(
+      await screen.findByText('Не удалось обновить избранное. Попробуйте ещё раз.'),
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'Добавить в избранное' })).toHaveLength(2);
+    });
+  });
+
+  it('ведёт анонима на вход с возвратом на ту же страницу', async () => {
+    const user = userEvent.setup();
+    renderAnonymous();
+
+    await user.click(screen.getByRole('button', { name: 'Добавить в избранное' }));
+
+    expect(await screen.findByRole('heading', { name: 'Вход' })).toBeInTheDocument();
   });
 
   it('берёт начальное состояние из общего кэша id', async () => {

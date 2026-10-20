@@ -1,4 +1,5 @@
 import type { FavoritesResponse } from '@staynest/shared';
+import type { InfiniteData, QueryKey } from '@tanstack/react-query';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   addFavoriteRequest,
@@ -13,6 +14,19 @@ const favoriteKeys = {
   ids: ['favorites', 'ids'] as const,
   list: ['favorites', 'list'] as const,
 };
+
+function withoutListing(
+  data: InfiniteData<FavoritesResponse>,
+  listingId: string,
+): InfiniteData<FavoritesResponse> {
+  return {
+    ...data,
+    pages: data.pages.map((page) => ({
+      ...page,
+      listings: page.listings.filter((listing) => listing.id !== listingId),
+    })),
+  };
+}
 
 /** Идентификаторы избранного для сердечек: один запрос на всё приложение. */
 export function useFavoriteIds(enabled = true) {
@@ -35,7 +49,10 @@ export function useFavorites() {
 }
 
 type ToggleInput = { listingId: string; favorite: boolean };
-type ToggleContext = { previous: string[] | undefined };
+type ToggleContext = {
+  previous: string[] | undefined;
+  previousLists: Array<[QueryKey, InfiniteData<FavoritesResponse> | undefined]>;
+};
 
 /**
  * Оптимистичное сердечко: состояние меняется сразу, при ошибке откатывается.
@@ -52,17 +69,29 @@ export function useToggleFavorite() {
     async onMutate({ listingId, favorite }) {
       await queryClient.cancelQueries({ queryKey: favoriteKeys.ids });
       const previous = queryClient.getQueryData<string[]>(favoriteKeys.ids);
+      const previousLists = queryClient.getQueriesData<InfiniteData<FavoritesResponse>>({
+        queryKey: favoriteKeys.list,
+      });
 
       queryClient.setQueryData<string[]>(favoriteKeys.ids, (current = []) => {
         if (favorite) return current.includes(listingId) ? current : [listingId, ...current];
         return current.filter((id) => id !== listingId);
       });
 
-      return { previous };
+      if (!favorite) {
+        queryClient.setQueriesData<InfiniteData<FavoritesResponse>>(
+          { queryKey: favoriteKeys.list },
+          (current) => (current ? withoutListing(current, listingId) : current),
+        );
+      }
+
+      return { previous, previousLists };
     },
 
     onError(_error, _variables, context) {
-      if (context?.previous) queryClient.setQueryData(favoriteKeys.ids, context.previous);
+      if (!context) return;
+      queryClient.setQueryData(favoriteKeys.ids, context.previous);
+      for (const [key, data] of context.previousLists) queryClient.setQueryData(key, data);
     },
 
     onSettled() {

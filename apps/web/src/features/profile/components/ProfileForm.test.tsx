@@ -13,13 +13,15 @@ function renderForm(user = demoUser) {
   });
   queryClient.setQueryData(queryKeys.me, user);
 
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <ProfileForm user={user} />
       </ToastProvider>
     </QueryClientProvider>,
   );
+
+  return { ...view, queryClient };
 }
 
 describe('ProfileForm', () => {
@@ -30,7 +32,7 @@ describe('ProfileForm', () => {
   it('сохраняет имя и телефон через PATCH /me', async () => {
     const fetchMock = mockApi({ user: demoUser });
     const user = userEvent.setup();
-    renderForm();
+    const { queryClient } = renderForm();
 
     const name = screen.getByLabelText('Имя');
     await user.clear(name);
@@ -40,6 +42,12 @@ describe('ProfileForm', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Профиль обновлён.')).toBeInTheDocument();
+    });
+
+    // Сервер вернул обновлённого пользователя — кэш `me` должен обновиться.
+    expect(queryClient.getQueryData(queryKeys.me)).toMatchObject({
+      displayName: 'Анна Лесная',
+      phone: '+7 900 000-00-00',
     });
 
     const patch = fetchMock.mock.calls.find(
@@ -69,6 +77,21 @@ describe('ProfileForm', () => {
       );
       expect(patch).toBeTruthy();
       expect(JSON.parse(String((patch?.[1] as RequestInit).body))).toMatchObject({ phone: null });
+    });
+  });
+
+  it('показывает ошибку и не обновляет кэш при сбое PATCH', async () => {
+    mockApi({ user: demoUser, profileStatus: 500 });
+    const user = userEvent.setup();
+    const { queryClient } = renderForm();
+
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    expect(
+      await screen.findByText('Не удалось сохранить профиль. Попробуйте ещё раз.'),
+    ).toBeInTheDocument();
+    expect(queryClient.getQueryData(queryKeys.me)).toMatchObject({
+      displayName: demoUser.displayName,
     });
   });
 });

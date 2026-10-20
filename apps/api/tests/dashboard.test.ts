@@ -22,6 +22,12 @@ function monthKey(today: string, offset: number): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Последний день месяца `YYYY-MM` без перехода в следующую таймзону. */
+function monthEnd(month: string): number {
+  const [year, value] = month.split('-').map(Number);
+  return new Date(Date.UTC(year ?? 1970, value ?? 1, 0)).getUTCDate();
+}
+
 async function dashboard(h: Harness, user: TestUser, months = 3): Promise<DashboardResponse> {
   const response = await h.app.inject({
     method: 'GET',
@@ -67,7 +73,8 @@ describeDatabase('сводка хозяина', () => {
     const main = await seedListing(h, host.id);
 
     // Одна активная заявка и одна просроченная: просроченная не должна попасть в счётчик.
-    const activePending = await seedListing(h, host.id);
+    // Эти дома черновики: занятость считается только по опубликованным.
+    const activePending = await seedListing(h, host.id, { status: 'draft' });
     await insertBookingRow(h, {
       listingId: activePending,
       guestId: guest.id,
@@ -76,7 +83,7 @@ describeDatabase('сводка хозяина', () => {
       status: 'pending',
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     });
-    const expiredPending = await seedListing(h, host.id);
+    const expiredPending = await seedListing(h, host.id, { status: 'draft' });
     await insertBookingRow(h, {
       listingId: expiredPending,
       guestId: guest.id,
@@ -189,6 +196,171 @@ describeDatabase('сводка хозяина', () => {
     expect(data.upcomingCheckIns).toHaveLength(0);
     expect(data.occupancy).toMatchObject({ bookedNights: 0, blockedNights: 0, percent: 0 });
     expect(data.revenue.months.every((month) => month.totalMinor === 0)).toBe(true);
+  });
+
+  it('обрезает брони и блокировки границами окна 30 дней', async () => {
+    const today = todayInTimeZone('Europe/Moscow');
+    const boundaryHost = await createUser(h, 'boundary@example.ru', 'Границы');
+    const home = await seedListing(h, boundaryHost.id);
+
+    const startsAtEnd = await seedListing(h, boundaryHost.id, { status: 'draft' });
+    const ongoing = await seedListing(h, boundaryHost.id, { status: 'draft' });
+    const lateBlockHome = await seedListing(h, boundaryHost.id, { status: 'draft' });
+
+    // Заезд начинается до конца окна и заканчивается после: 1 ночь.
+    await insertBookingRow(h, {
+      listingId: home,
+      guestId: guest.id,
+      from: addDays(today, 29),
+      to: addDays(today, 32),
+      status: 'confirmed',
+      confirmedAt: new Date(),
+    });
+    // Заезд ровно на границе окна уже не попадает.
+    await insertBookingRow(h, {
+      listingId: startsAtEnd,
+      guestId: guest.id,
+      from: addDays(today, 30),
+      to: addDays(today, 32),
+      status: 'confirmed',
+      confirmedAt: new Date(),
+    });
+    // Уже идущий заезд: 2 ночи в окне, но это не «ближайший заезд».
+    await insertBookingRow(h, {
+      listingId: ongoing,
+      guestId: guest.id,
+      from: addDays(today, -2),
+      to: addDays(today, 2),
+      status: 'confirmed',
+      confirmedAt: new Date(),
+    });
+    // Блокировка внутри окна.
+    await h.db.kysely
+      .insertInto('listing_blocks')
+      .values({
+        listing_id: home,
+        block_range: sql<string>`daterange(${addDays(today, 5)}::date, ${addDays(today, 8)}::date, '[)')`,
+        reason: null,
+      })
+      .execute();
+    // Блокировка после окна не считается.
+    await h.db.kysely
+      .insertInto('listing_blocks')
+      .values({
+        listing_id: lateBlockHome,
+        block_range: sql<string>`daterange(${addDays(today, 33)}::date, ${addDays(today, 35)}::date, '[)')`,
+        reason: null,
+      })
+      .execute();
+
+    const data = await dashboard(h, boundaryHost);
+
+    expect(data.occupancy).toEqual({
+      from: today,
+      to: addDays(today, 30),
+      totalNights: 30,
+      bookedNights: 3,
+      blockedNights: 3,
+      occupiedNights: 6,
+      percent: 20,
+    });
+    expect(data.upcomingCheckIns.map((item) => item.checkIn)).toEqual([addDays(today, 29)]);
+  });
+
+  it('делит занятость на все опубликованные дома хозяина', async () => {
+    const today = todayInTimeZone('Europe/Moscow');
+    const multiHost = await createUser(h, 'multi@example.ru', 'Два дома');
+    const first = await seedListing(h, multiHost.id);
+    const second = await seedListing(h, multiHost.id);
+
+    for (const listingId of [first, second]) {
+      await insertBookingRow(h, {
+        listingId,
+        guestId: guest.id,
+        from: addDays(today, 3),
+        to: addDays(today, 5),
+        status: 'confirmed',
+        confirmedAt: new Date(),
+      });
+    }
+
+    const data = await dashboard(h, multiHost);
+
+    expect(data.occupancy).toMatchObject({
+      totalNights: 60,
+      bookedNights: 4,
+      occupiedNights: 4,
+      percent: 7,
+    });
+  });
+
+  it('группирует доход по месяцу заезда, а не выезда', async () => {
+    const today = todayInTimeZone('Europe/Moscow');
+    const revenueHost = await createUser(h, 'revenue@example.ru', 'Доход');
+    const home = await seedListing(h, revenueHost.id);
+    const previousMonth = monthKey(today, -1);
+    const beforePrevious = monthKey(today, -2);
+    const lastDay = monthEnd(previousMonth);
+    const crossingCheckIn = `${previousMonth}-${String(lastDay).padStart(2, '0')}`;
+
+    // Заезд в последний день месяца, выезд уже в следующем: доход — в месяце заезда.
+    await insertBookingRow(h, {
+      listingId: home,
+      guestId: guest.id,
+      from: crossingCheckIn,
+      to: addDays(crossingCheckIn, 2),
+      status: 'completed',
+      confirmedAt: new Date(`${previousMonth}-01T10:00:00Z`),
+    });
+    await insertBookingRow(h, {
+      listingId: home,
+      guestId: guest.id,
+      from: `${beforePrevious}-10`,
+      to: `${beforePrevious}-12`,
+      status: 'completed',
+      confirmedAt: new Date(`${beforePrevious}-01T10:00:00Z`),
+    });
+
+    const data = await dashboard(h, revenueHost);
+
+    expect(data.revenue.months).toEqual([
+      { month: beforePrevious, totalMinor: 100_000, bookings: 1 },
+      { month: previousMonth, totalMinor: 100_000, bookings: 1 },
+      { month: monthKey(today, 0), totalMinor: 0, bookings: 0 },
+    ]);
+  });
+
+  it('возвращает не больше пяти ближайших заездов по возрастанию даты', async () => {
+    const today = todayInTimeZone('Europe/Moscow');
+    const manyHost = await createUser(h, 'many@example.ru', 'Много заездов');
+    const home = await seedListing(h, manyHost.id);
+
+    for (let index = 0; index < 6; index += 1) {
+      await insertBookingRow(h, {
+        listingId: home,
+        guestId: guest.id,
+        from: addDays(today, index),
+        to: addDays(today, index + 1),
+        status: 'confirmed',
+        confirmedAt: new Date(),
+      });
+    }
+
+    const data = await dashboard(h, manyHost);
+
+    expect(data.upcomingCheckIns).toHaveLength(5);
+    expect(data.upcomingCheckIns.map((item) => item.checkIn)).toEqual(
+      Array.from({ length: 5 }, (_, index) => addDays(today, index)),
+    );
+  });
+
+  it('возвращает ровно запрошенное число месяцев, включая переход через год', async () => {
+    const today = todayInTimeZone('Europe/Moscow');
+    const data = await dashboard(h, host, 12);
+
+    expect(data.revenue.months).toHaveLength(12);
+    expect(data.revenue.months[0]?.month).toBe(monthKey(today, -11));
+    expect(data.revenue.months.at(-1)?.month).toBe(monthKey(today, 0));
   });
 
   it('ограничивает число месяцев и требует авторизацию', async () => {

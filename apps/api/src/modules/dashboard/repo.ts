@@ -39,6 +39,18 @@ export type UpcomingWindow = {
   limit: number;
 };
 
+/** Активные (опубликованные) дома хозяина: знаменатель занятости. */
+export async function countHostListings(executor: DbExecutor, ownerId: string): Promise<number> {
+  const row = await executor
+    .selectFrom('listings')
+    .select(({ fn }) => fn.countAll<string>().as('count'))
+    .where('owner_id', '=', ownerId)
+    .where('status', '=', 'published')
+    .executeTakeFirstOrThrow();
+
+  return Number(row.count);
+}
+
 export function listUpcomingCheckIns(
   executor: DbExecutor,
   ownerId: string,

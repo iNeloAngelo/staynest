@@ -45,10 +45,10 @@ export function FavoriteButton({ listingId, className }: FavoriteButtonProps) {
       aria-pressed={isFavorite}
       aria-label={t(isFavorite ? 'favorites.remove' : 'favorites.add')}
       className={cn(
-        'inline-flex size-11 items-center justify-center rounded-full border border-border bg-surface/90 text-ink-muted shadow-sm backdrop-blur',
-        'transition-colors duration-micro hover:text-danger',
+        'inline-flex size-11 items-center justify-center rounded-full border border-border bg-surface/90 shadow-sm backdrop-blur',
+        'transition-colors duration-micro',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-        isFavorite && 'text-danger',
+        isFavorite ? 'text-danger' : 'text-ink-muted hover:text-danger',
         className,
       )}
     >

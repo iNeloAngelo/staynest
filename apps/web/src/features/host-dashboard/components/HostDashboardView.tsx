@@ -8,9 +8,17 @@ import { RevenueChart } from './RevenueChart';
 import { UpcomingCheckIns } from './UpcomingCheckIns';
 
 function DashboardSkeleton() {
+  const { t } = useTranslation();
+
   return (
-    <div className="flex flex-col gap-4" aria-hidden="true">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div
+      role="status"
+      aria-busy="true"
+      aria-label={t('common.loading')}
+      className="flex flex-col gap-4"
+    >
+      <span className="sr-only">{t('common.loading')}</span>
+      <div aria-hidden="true" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
           <Skeleton key={index} className="h-32 w-full rounded-lg" />
         ))}
@@ -35,7 +43,7 @@ export function HostDashboardView() {
 
       {query.isPending ? <DashboardSkeleton /> : null}
 
-      {query.isError ? (
+      {query.isError && !query.data ? (
         <EmptyState
           icon={<WifiOff className="size-6" aria-hidden="true" />}
           title={online ? t('hostDashboard.loadErrorTitle') : t('hostDashboard.offlineTitle')}

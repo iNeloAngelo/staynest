@@ -8,11 +8,16 @@ import { ListingCard, ListingCardSkeleton } from '../../catalog/components/Listi
 import { useFavorites } from '../api/hooks';
 
 function SkeletonGrid() {
+  const { t } = useTranslation();
+
   return (
-    <div aria-hidden="true" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 3 }, (_, index) => (
-        <ListingCardSkeleton key={index} />
-      ))}
+    <div role="status" aria-busy="true" aria-label={t('common.loading')}>
+      <span className="sr-only">{t('common.loading')}</span>
+      <div aria-hidden="true" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <ListingCardSkeleton key={index} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -41,6 +46,7 @@ function OfflineNotice() {
   );
 }
 
+// eslint-disable-next-line complexity -- экран имеет четыре взаимоисключающих состояния.
 export function FavoritesView() {
   const { t } = useTranslation();
   const online = useOnline();
@@ -49,7 +55,7 @@ export function FavoritesView() {
 
   if (query.isPending) return <SkeletonGrid />;
 
-  if (query.isError) {
+  if (query.isError && listings.length === 0) {
     return (
       <EmptyState
         icon={<WifiOff className="size-6" aria-hidden="true" />}
@@ -82,6 +88,11 @@ export function FavoritesView() {
   return (
     <div className="flex flex-col gap-6">
       {!online ? <OfflineNotice /> : null}
+      {query.isError ? (
+        <p role="alert" className="text-small text-danger">
+          {t('favorites.loadMoreError')}
+        </p>
+      ) : null}
       <FavoritesGrid listings={listings} />
 
       {query.hasNextPage ? (

@@ -1,6 +1,6 @@
 import { AVATAR_MAX_BYTES } from '@staynest/shared';
 import type { UserDto } from '@staynest/shared';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../../../shared/ui';
@@ -13,6 +13,7 @@ export function useAvatarControls(user: UserDto) {
   const upload = useUploadAvatar();
   const remove = useRemoveAvatar();
   const busy = upload.isPending || remove.isPending;
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function onFile(event: ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0];
@@ -20,7 +21,7 @@ export function useAvatarControls(user: UserDto) {
     event.target.value = '';
     if (!file) return;
 
-    if (!file.type.startsWith('image/') || file.size > AVATAR_MAX_BYTES) {
+    if (file.size > AVATAR_MAX_BYTES) {
       toast.show({ title: t('profile.avatarError'), tone: 'error' });
       return;
     }
@@ -30,8 +31,13 @@ export function useAvatarControls(user: UserDto) {
     });
   }
 
-  function onRemove(): void {
+  function openRemove(): void {
     if (!user.avatarUrl) return;
+    setConfirmOpen(true);
+  }
+
+  function confirmRemove(): void {
+    setConfirmOpen(false);
 
     remove.mutate(undefined, {
       onSuccess: () => toast.show({ title: t('profile.avatarRemoved'), tone: 'success' }),
@@ -39,5 +45,15 @@ export function useAvatarControls(user: UserDto) {
     });
   }
 
-  return { inputRef, upload, remove, busy, onFile, onRemove };
+  return {
+    inputRef,
+    upload,
+    remove,
+    busy,
+    onFile,
+    openRemove,
+    confirmRemove,
+    confirmOpen,
+    closeRemove: () => setConfirmOpen(false),
+  };
 }
