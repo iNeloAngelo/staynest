@@ -168,7 +168,10 @@ function depositDeadlineFor(
   now: Date,
 ): Date | null {
   if (action !== 'confirm' || !runtime.config.payments.mockEnabled) return null;
-  const amount = depositAmountMinor(Number(row.total_minor), runtime.config.payments.depositPercent);
+  const amount = depositAmountMinor(
+    Number(row.total_minor),
+    runtime.config.payments.depositPercent,
+  );
   return amount === null ? null : depositDueAt(runtime.config.payments.depositTtlHours, now);
 }
 
@@ -214,11 +217,7 @@ async function detailFor(
   });
 }
 
-function actionPayload(
-  row: LockedBooking,
-  target: BookingStatus,
-  now: Date,
-): BookingEventPayload {
+function actionPayload(row: LockedBooking, target: BookingStatus, now: Date): BookingEventPayload {
   return {
     bookingId: row.id,
     listingId: row.listing_id,

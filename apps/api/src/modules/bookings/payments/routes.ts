@@ -13,11 +13,7 @@ import { createPaymentRuntime } from './context';
 import { findPaymentSession } from './repo';
 import type { PaymentSessionRow } from './repo';
 import { paymentPage } from './page';
-import {
-  MOCK_SIGNATURE_HEADER,
-  signMockWebhook,
-  verifyMockWebhook,
-} from './provider';
+import { MOCK_SIGNATURE_HEADER, signMockWebhook, verifyMockWebhook } from './provider';
 
 const paramsSchema = z.object({ id: z.uuid() }).strict();
 const tokenParamsSchema = z.object({ token: z.string().min(8).max(200) }).strict();
@@ -78,9 +74,10 @@ async function renderPage(
   noStore(reply);
   const session = await findPaymentSession(runtime.db.kysely, token);
   if (!session) {
-    return reply.status(404).type('text/html; charset=utf-8').send(
-      paymentPage({ state: 'unavailable', message: 'Платёж не найден.' }),
-    );
+    return reply
+      .status(404)
+      .type('text/html; charset=utf-8')
+      .send(paymentPage({ state: 'unavailable', message: 'Платёж не найден.' }));
   }
 
   const back = bookingUrl(runtime.config, session.booking_id, 'back');
@@ -124,9 +121,10 @@ function registerMockPage(app: FastifyInstance, runtime: PaymentRuntime): void {
     const session = await findPaymentSession(runtime.db.kysely, token);
     if (!session) {
       noStore(reply);
-      return reply.status(404).type('text/html; charset=utf-8').send(
-        paymentPage({ state: 'unavailable', message: 'Платёж не найден.' }),
-      );
+      return reply
+        .status(404)
+        .type('text/html; charset=utf-8')
+        .send(paymentPage({ state: 'unavailable', message: 'Платёж не найден.' }));
     }
     if (session.status !== 'created' || isExpired(session.deposit_due_at, runtime.now())) {
       return reply.redirect(bookingUrl(runtime.config, session.booking_id, 'done'), 303);
@@ -178,7 +176,11 @@ function registerDepositRoute(app: FastifyInstance, runtime: PaymentRuntime): vo
 }
 
 export const paymentRoutes: FastifyPluginAsync<PaymentRoutesOptions> = async (app, options) => {
-  const runtime = createPaymentRuntime({ db: options.db, config: options.config, now: options.now });
+  const runtime = createPaymentRuntime({
+    db: options.db,
+    config: options.config,
+    now: options.now,
+  });
 
   // Сырое тело нужно для проверки HMAC; парсеры живут только в этом плагине
   // и не меняют разбор JSON в остальных маршрутах бронирования.

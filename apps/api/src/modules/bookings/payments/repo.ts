@@ -253,4 +253,3 @@ export async function failOpenDeposits(
 
   return rows.length;
 }
-

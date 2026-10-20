@@ -49,6 +49,8 @@ describe('подписи уведомлений', () => {
     const notification = demoNotification();
 
     expect(notificationHref(notification)).toBe(`/bookings/${notification.payload.bookingId}`);
-    expect(Object.keys(NOTIFICATION_META).sort()).toEqual([...notificationTypeSchema.options].sort());
+    expect(Object.keys(NOTIFICATION_META).sort()).toEqual(
+      [...notificationTypeSchema.options].sort(),
+    );
   });
 });

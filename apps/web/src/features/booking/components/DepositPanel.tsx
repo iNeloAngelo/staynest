@@ -92,13 +92,7 @@ function openPayment(payUrl: string): void {
   window.location.assign(url.toString());
 }
 
-export function DepositPanel({
-  booking,
-  viewer,
-}: {
-  booking: BookingDetail;
-  viewer: Viewer;
-}) {
+export function DepositPanel({ booking, viewer }: { booking: BookingDetail; viewer: Viewer }) {
   const { t, i18n } = useTranslation();
   const { locale } = useLocale();
   const online = useOnline();
@@ -144,9 +138,7 @@ export function DepositPanel({
             disabled={!online}
             loading={start.isPending}
           >
-            {deposit.status === 'failed'
-              ? t('booking.deposit.retry')
-              : t('booking.deposit.pay')}
+            {deposit.status === 'failed' ? t('booking.deposit.retry') : t('booking.deposit.pay')}
           </Button>
           {!online ? (
             <p className="text-caption text-ink-muted">{t('booking.deposit.offline')}</p>

@@ -157,8 +157,7 @@ function alreadyProcessed(payment: PaymentRow, event: MockPaymentWebhook): boole
 
 function amountsMatch(payment: PaymentRow, event: MockPaymentWebhook): boolean {
   return (
-    Number(payment.amount_minor) === event.amountMinor &&
-    payment.currency.trim() === event.currency
+    Number(payment.amount_minor) === event.amountMinor && payment.currency.trim() === event.currency
   );
 }
 
@@ -205,7 +204,12 @@ async function handleWebhook(
       // Поздний успех после отмены: провайдер всё же списал деньги, фиксируем
       // возврат, даже если отмена уже успела закрыть сессию.
       if (event.status === 'succeeded') {
-        await updatePaymentStatus(trx, payment.id, paymentOutcome(booking, runtime.now()), event as unknown as Json);
+        await updatePaymentStatus(
+          trx,
+          payment.id,
+          paymentOutcome(booking, runtime.now()),
+          event as unknown as Json,
+        );
         return { received: true, replayed: false };
       }
       throw paymentWebhookConflict();

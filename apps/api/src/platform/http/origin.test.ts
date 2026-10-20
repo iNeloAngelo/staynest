@@ -14,7 +14,9 @@ describe('origin guard', () => {
   const guard = createOriginGuard(['https://staynest.example']);
 
   it('пропускает безопасные методы без проверки Origin', async () => {
-    await expect(guard(request('GET', { origin: 'https://evil.example' }))).resolves.toBeUndefined();
+    await expect(
+      guard(request('GET', { origin: 'https://evil.example' })),
+    ).resolves.toBeUndefined();
   });
 
   it('пропускает разрешённый Origin и запросы без Origin', async () => {
@@ -44,28 +46,22 @@ describe('origin guard', () => {
   it('освобождает только точный путь вебхука', async () => {
     await expect(
       guard(
-        request(
-          'POST',
-          { origin: 'https://provider.example' },
-          '/api/v1/payments/webhook/mock',
-        ),
+        request('POST', { origin: 'https://provider.example' }, '/api/v1/payments/webhook/mock'),
       ),
     ).resolves.toBeUndefined();
 
     await expect(
       guard(
-        request(
-          'POST',
-          { origin: 'https://evil.example' },
-          '/api/v1/payments/webhook/mock/extra',
-        ),
+        request('POST', { origin: 'https://evil.example' }, '/api/v1/payments/webhook/mock/extra'),
       ),
     ).rejects.toMatchObject({ code: 'origin_not_allowed' });
   });
 
   it('в dev разрешает loopback на любом порту, в production — только список', async () => {
     const dev = createOriginGuard(['http://localhost:5173'], { allowLoopback: true });
-    await expect(dev(request('POST', { origin: 'http://127.0.0.1:5174' }))).resolves.toBeUndefined();
+    await expect(
+      dev(request('POST', { origin: 'http://127.0.0.1:5174' })),
+    ).resolves.toBeUndefined();
     await expect(dev(request('POST', { origin: 'http://[::1]:4173' }))).resolves.toBeUndefined();
 
     const prod = createOriginGuard(['https://staynest.example'], { allowLoopback: false });

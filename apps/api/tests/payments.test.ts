@@ -261,10 +261,7 @@ describeDatabase('депозит и вебхуки', () => {
     });
 
     expect(response.statusCode).toBe(400);
-    const rows = await client.query(
-      'SELECT raw_event FROM payments WHERE booking_id = $1',
-      [id],
-    );
+    const rows = await client.query('SELECT raw_event FROM payments WHERE booking_id = $1', [id]);
     expect(rows.rows[0].raw_event).toBeNull();
   });
 
@@ -276,7 +273,12 @@ describeDatabase('депозит и вебхуки', () => {
       [id],
     );
 
-    const jobs = createPaymentJobs({ db: h.db, config: h.config, events: h.events, logger: h.logger });
+    const jobs = createPaymentJobs({
+      db: h.db,
+      config: h.config,
+      events: h.events,
+      logger: h.logger,
+    });
     const count = await jobs.expireDeposits();
     expect(count).toBe(1);
 
