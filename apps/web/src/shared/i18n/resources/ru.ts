@@ -227,7 +227,6 @@ export const ru = {
   'profile.saving': 'Сохраняем…',
   'profile.saved': 'Профиль обновлён.',
   'profile.saveError': 'Не удалось сохранить профиль. Попробуйте ещё раз.',
-  'profile.avatar': 'Фото профиля',
   'profile.avatarHint': 'JPEG, PNG, WebP или AVIF до 5 МБ. Фото обрежется до квадрата.',
   'profile.avatarUpload': 'Загрузить фото',
   'profile.avatarChange': 'Сменить фото',

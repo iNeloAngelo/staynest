@@ -34,7 +34,7 @@ function Bar({ month, x, width, height, currency }: BarProps) {
       width={width}
       height={height}
       rx={4}
-      className={month.totalMinor === 0 ? 'fill-surface-2' : 'fill-primary'}
+      className={month.totalMinor === 0 ? 'fill-ink-muted/30' : 'fill-primary'}
     >
       <title>
         {t('hostDashboard.chartPoint', {

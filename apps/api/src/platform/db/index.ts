@@ -34,8 +34,10 @@ function createKysely(pool: Pool): AppDatabase {
 export function createDb(connectionString: string, logger: Logger, queryTimeoutMs: number): Db {
   const pool = new Pool({
     connectionString,
-    max: 10,
-    connectionTimeoutMillis: 2000,
+    // 20 соединений и 5 секунд на ожидание: 50 параллельных заявок в тесте
+    // иначе упираются в 2-секундный таймаут под нагрузкой CPU.
+    max: 20,
+    connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30_000,
     query_timeout: queryTimeoutMs,
     statement_timeout: queryTimeoutMs,

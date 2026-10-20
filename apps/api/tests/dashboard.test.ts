@@ -203,8 +203,8 @@ describeDatabase('сводка хозяина', () => {
     const boundaryHost = await createUser(h, 'boundary@example.ru', 'Границы');
     const home = await seedListing(h, boundaryHost.id);
 
-    const startsAtEnd = await seedListing(h, boundaryHost.id, { status: 'draft' });
-    const ongoing = await seedListing(h, boundaryHost.id, { status: 'draft' });
+    const startsAtEnd = await seedListing(h, boundaryHost.id);
+    const ongoing = await seedListing(h, boundaryHost.id);
     const lateBlockHome = await seedListing(h, boundaryHost.id, { status: 'draft' });
 
     // Заезд начинается до конца окна и заканчивается после: 1 ночь.
@@ -234,6 +234,15 @@ describeDatabase('сводка хозяина', () => {
       status: 'confirmed',
       confirmedAt: new Date(),
     });
+    // Блокировка, начавшаяся до окна: в окно попадают только 2 ночи.
+    await h.db.kysely
+      .insertInto('listing_blocks')
+      .values({
+        listing_id: home,
+        block_range: sql<string>`daterange(${addDays(today, -5)}::date, ${addDays(today, 2)}::date, '[)')`,
+        reason: null,
+      })
+      .execute();
     // Блокировка внутри окна.
     await h.db.kysely
       .insertInto('listing_blocks')
@@ -258,11 +267,11 @@ describeDatabase('сводка хозяина', () => {
     expect(data.occupancy).toEqual({
       from: today,
       to: addDays(today, 30),
-      totalNights: 30,
+      totalNights: 90,
       bookedNights: 3,
-      blockedNights: 3,
-      occupiedNights: 6,
-      percent: 20,
+      blockedNights: 5,
+      occupiedNights: 8,
+      percent: 9,
     });
     expect(data.upcomingCheckIns.map((item) => item.checkIn)).toEqual([addDays(today, 29)]);
   });

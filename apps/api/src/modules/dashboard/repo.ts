@@ -96,6 +96,7 @@ export async function sumBookedNights(
         GREATEST(lower(bookings.stay_range), ${from}::date), 0)), 0)::text`.as('nights'),
     )
     .where('listings.owner_id', '=', ownerId)
+    .where('listings.status', '=', 'published')
     .where('bookings.status', '=', 'confirmed')
     .where(sql<boolean>`bookings.stay_range && daterange(${from}::date, ${to}::date, '[)')`)
     .executeTakeFirstOrThrow();
@@ -119,6 +120,7 @@ export async function sumBlockedNights(
         GREATEST(lower(listing_blocks.block_range), ${from}::date), 0)), 0)::text`.as('nights'),
     )
     .where('listings.owner_id', '=', ownerId)
+    .where('listings.status', '=', 'published')
     .where(sql<boolean>`listing_blocks.block_range && daterange(${from}::date, ${to}::date, '[)')`)
     .executeTakeFirstOrThrow();
 

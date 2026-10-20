@@ -228,7 +228,6 @@ export const en = {
   'profile.saving': 'Saving…',
   'profile.saved': 'Profile updated.',
   'profile.saveError': 'Could not save the profile. Try again.',
-  'profile.avatar': 'Profile photo',
   'profile.avatarHint': 'JPEG, PNG, WebP or AVIF up to 5 MB. The photo is cropped to a square.',
   'profile.avatarUpload': 'Upload photo',
   'profile.avatarChange': 'Change photo',

@@ -2,7 +2,7 @@ import type { UserDto } from '@staynest/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '../../../shared/api';
 import { ToastProvider } from '../../../shared/ui';
@@ -34,6 +34,18 @@ function renderPair(user = demoUser) {
   return { ...view, queryClient };
 }
 
+function LoginProbe() {
+  const location = useLocation();
+  const next = new URLSearchParams(location.search).get('next');
+
+  return (
+    <>
+      <h1>Вход</h1>
+      <p data-testid="login-next">{next}</p>
+    </>
+  );
+}
+
 function renderAnonymous() {
   const queryClient = newClient(null);
 
@@ -42,7 +54,7 @@ function renderAnonymous() {
       <ToastProvider>
         <MemoryRouter initialEntries={['/listings/abc']}>
           <Routes>
-            <Route path="/login" element={<h1>Вход</h1>} />
+            <Route path="/login" element={<LoginProbe />} />
             <Route path="*" element={<FavoriteButton listingId={demoPublicListing.id} />} />
           </Routes>
         </MemoryRouter>
@@ -137,6 +149,7 @@ describe('FavoriteButton', () => {
     await user.click(screen.getByRole('button', { name: 'Добавить в избранное' }));
 
     expect(await screen.findByRole('heading', { name: 'Вход' })).toBeInTheDocument();
+    expect(screen.getByTestId('login-next')).toHaveTextContent('/listings/abc');
   });
 
   it('берёт начальное состояние из общего кэша id', async () => {

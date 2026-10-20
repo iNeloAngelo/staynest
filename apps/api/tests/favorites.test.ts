@@ -143,6 +143,12 @@ describeDatabase('избранное', () => {
   });
 
   it('архивные дома не занимают страницу и не оставляют пустой курсор', async () => {
+    // Сначала опубликованный, потом архивные: без фильтра в SQL архивные
+    // были бы новее и заняли бы всю первую страницу.
+    const publishedId = await seedListing(h, owner.id);
+    await putFavorite(h, guest, publishedId);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
     const archivedIds: string[] = [];
     for (let index = 0; index < 2; index += 1) {
       const id = await seedListing(h, owner.id);
@@ -150,8 +156,6 @@ describeDatabase('избранное', () => {
       await putFavorite(h, guest, id);
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    const publishedId = await seedListing(h, owner.id);
-    await putFavorite(h, guest, publishedId);
 
     await h.db.kysely
       .updateTable('listings')
