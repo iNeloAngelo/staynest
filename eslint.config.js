@@ -66,6 +66,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['apps/web/public/*.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker },
+    },
+  },
+  {
     files: ['**/*.test.{ts,tsx}', '**/test/**/*.{ts,tsx}'],
     rules: {
       'max-lines': 'off',

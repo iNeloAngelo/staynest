@@ -1,5 +1,6 @@
 import { useMe } from '../../features/auth';
 import { ModeSwitchControl } from '../../features/mode-switch';
+import { NotificationBell, usePushOwnerGuard } from '../../features/notifications';
 import { Skeleton } from '../../shared/ui';
 import { LanguageToggle } from './LanguageToggle';
 import { LoginLink, ProfileLink } from './ProfileLink';
@@ -7,6 +8,7 @@ import { LogoLink } from './LogoLink';
 
 export function AppHeader() {
   const { data: user, isPending } = useMe();
+  usePushOwnerGuard(user?.id);
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-bg pt-safe">
@@ -23,7 +25,10 @@ export function AppHeader() {
           {isPending ? (
             <Skeleton className="size-11 rounded-full" />
           ) : user ? (
-            <ProfileLink user={user} />
+            <>
+              <NotificationBell enabled userId={user.id} />
+              <ProfileLink user={user} />
+            </>
           ) : (
             <LoginLink />
           )}

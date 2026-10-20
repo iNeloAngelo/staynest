@@ -6,6 +6,7 @@ import type {
   HostCalendarResponse,
   ListingDto,
   ListingPhotoDto,
+  NotificationDto,
   PriceRuleDto,
   PublicListing,
   PublicListingSummary,
@@ -200,6 +201,27 @@ export function demoBookingDetail(status: BookingSummary['status'] = 'pending'):
   };
 }
 
+export function demoNotification(overrides: Partial<NotificationDto> = {}): NotificationDto {
+  const booking = demoBooking('pending');
+  return {
+    id: 'd4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f70',
+    type: 'booking_requested',
+    payload: {
+      bookingId: booking.id,
+      listingId: booking.listingId,
+      listingTitle: booking.listing.title,
+      checkIn: booking.checkIn,
+      checkOut: booking.checkOut,
+      guestName: booking.guest.displayName,
+      totalMinor: booking.totalMinor,
+      currency: booking.currency,
+    },
+    readAt: null,
+    createdAt: '2026-10-20T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
 export function demoCalendar(listingId = demoPublicListing.id): CalendarResponse {
   const today = todayLocalIso();
   return {
@@ -272,6 +294,9 @@ export type ApiMockOptions = {
   blocks?: BlockDto[];
   bookings?: BookingSummary[];
   bookingDetail?: BookingDetail;
+  notifications?: NotificationDto[];
+  unreadCount?: number;
+  pushEnabled?: boolean;
   bookingCreateStatus?: number;
   bookingCreateBody?: unknown;
   pendingHostCalendar?: boolean;
@@ -523,9 +548,51 @@ function bookingsRoute(ctx: RouteContext, details: Map<string, BookingDetail>): 
   return bookingDetailRoute(ctx, details);
 }
 
+function notificationsRoute({ url, method, options }: RouteContext): Response | null {
+  if (url.includes('/me/push/config')) {
+    return jsonResponse({
+      enabled: options.pushEnabled ?? false,
+      publicKey: options.pushEnabled ? 'test-public-key' : null,
+    });
+  }
+
+  if (url.includes('/me/push-subscriptions')) {
+    if (method === 'DELETE') return new Response(null, { status: 204 });
+    return jsonResponse(
+      {
+        subscription: {
+          id: 'f2f7e8d1-4f1a-4c6e-9a0b-1c2d3e4f5a6c',
+          endpoint: 'https://push.example.test/mock',
+          createdAt: '2026-10-20T10:00:00.000Z',
+        },
+      },
+      201,
+    );
+  }
+
+  if (url.endsWith('/me/notifications/read')) {
+    const unreadCount = options.unreadCount ?? 0;
+    return jsonResponse({ updated: 0, unreadCount });
+  }
+
+  if (url.includes('/me/notifications')) {
+    const notifications = options.notifications ?? [];
+    return jsonResponse({
+      notifications,
+      unreadCount: options.unreadCount ?? notifications.filter((item) => !item.readAt).length,
+      nextCursor: null,
+    });
+  }
+
+  return null;
+}
+
 function route(ctx: RouteContext, details: Map<string, BookingDetail>): Response {
   const auth = authRoute(ctx);
   if (auth) return auth;
+
+  const notifications = notificationsRoute(ctx);
+  if (notifications) return notifications;
 
   const booking = bookingsRoute(ctx, details);
   if (booking) return booking;

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { authErrorKey, useLogout, useMe } from '../../features/auth';
 import { ModeSwitchControl } from '../../features/mode-switch';
+import { PushToggle, detachCurrentDevicePush } from '../../features/notifications';
 import { useLocale } from '../../shared/i18n';
 import { Badge, Button, Select, useToast } from '../../shared/ui';
 
@@ -77,6 +78,7 @@ export function ProfilePage() {
 
   async function onLogout(): Promise<void> {
     try {
+      await detachCurrentDevicePush();
       await logout.mutateAsync();
       toast.show({ title: t('toast.logoutSuccess'), tone: 'success' });
       navigate('/', { replace: true });
@@ -100,6 +102,10 @@ export function ProfilePage() {
 
       <AccountCard user={user} />
       <SettingsCard />
+
+      <section className="rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6">
+        <PushToggle enabled userId={user.id} />
+      </section>
 
       <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6">
         <div>
