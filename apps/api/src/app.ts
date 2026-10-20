@@ -57,6 +57,7 @@ const HELMET_OPTIONS = {
       baseUri: ["'self'"],
       frameAncestors: ["'none'"],
       objectSrc: ["'none'"],
+      formAction: ["'self'"],
       imgSrc: ["'self'", 'data:', 'blob:'],
     },
   },
