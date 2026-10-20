@@ -1,0 +1,18 @@
+# Конфигурация gitleaks для StayNest.
+#
+# Правило: allowlist расширяется только для конкретных синтетических значений
+# в тестах, с комментарием, почему это не секрет. Реальные ключи, .env и любые
+# новые файлы по-прежнему дают находку. Причина — ADR-101 в docs/DECISIONS.md.
+
+title = "StayNest"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Синтетические пароли и e2e-секрет из тестовых файлов: не используются ни в одном окружении"
+regexes = [
+  '''StrongPass-2026''',
+  '''Mountain-River-2027''',
+  '''e2e-secret-with-at-least-32-characters-long''',
+]
