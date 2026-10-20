@@ -8,7 +8,7 @@
 #   HEALTHCHECK_WEBHOOK_URL=          необязательный webhook (Slack/Discord/свой)
 set -euo pipefail
 
-REPO_DIR="/opt/staynest"
+REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
 
 # shellcheck disable=SC1091

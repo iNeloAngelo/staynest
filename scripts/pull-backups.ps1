@@ -24,6 +24,9 @@ if (-not $stamps) {
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 # Бэкапы содержат PII: доступ только текущему пользователю.
 & icacls $Destination /inheritance:r /grant:r "$($env:USERNAME):(OI)(CI)F" | Out-Null
+if ($LASTEXITCODE -ne 0) {
+  throw "icacls не закрыл доступ к $Destination (exit $LASTEXITCODE)"
+}
 
 function Assert-Sha256([string]$Path, [string]$ShaPath) {
   if (-not (Test-Path $Path) -or -not (Test-Path $ShaPath)) {
@@ -37,31 +40,51 @@ function Assert-Sha256([string]$Path, [string]$ShaPath) {
   return $actual
 }
 
+$incomplete = @()
+
 foreach ($remoteDump in ($stamps -split "`n" | Where-Object { $_ })) {
   $name = Split-Path $remoteDump -Leaf
   $stamp = $name -replace '^staynest-', '' -replace '\.dump\.age$', ''
   $target = Join-Path $Destination $stamp
   New-Item -ItemType Directory -Force -Path $target | Out-Null
 
-  $files = @(
+  # Сначала критичный для БД набор: без него offsite-копия бессмысленна.
+  $required = @(
     "staynest-$stamp.dump.age",
     "staynest-$stamp.dump.age.sha256",
     "staynest-$stamp.dump.restore-check.txt",
-    "staynest-globals-$stamp.sql.age",
-    "staynest-silo-$stamp.tar.gz.age",
-    "staynest-silo-$stamp.tar.gz.age.sha256"
+    "staynest-globals-$stamp.sql.age"
   )
-  foreach ($file in $files) {
+  foreach ($file in $required) {
     & scp -q "${SshHost}:${RemoteDir}/${file}" (Join-Path $target $file)
     if ($LASTEXITCODE -ne 0) {
       throw "scp не скачал $file (exit $LASTEXITCODE)"
     }
   }
-
   $dumpSha = Assert-Sha256 (Join-Path $target "staynest-$stamp.dump.age") (Join-Path $target "staynest-$stamp.dump.age.sha256")
-  $siloSha = Assert-Sha256 (Join-Path $target "staynest-silo-$stamp.tar.gz.age") (Join-Path $target "staynest-silo-$stamp.tar.gz.age.sha256")
 
-  Write-Host "OK: $target (dump $($dumpSha.Substring(0, 12))…, silo $($siloSha.Substring(0, 12))…)"
+  # Бакет — отдельно: если его не было в бэкапе, дамп БД всё равно уже в offsite.
+  $siloSha = $null
+  $siloFiles = @(
+    "staynest-silo-$stamp.tar.gz.age",
+    "staynest-silo-$stamp.tar.gz.age.sha256"
+  )
+  $siloOk = $true
+  foreach ($file in $siloFiles) {
+    & scp -q "${SshHost}:${RemoteDir}/${file}" (Join-Path $target $file)
+    if ($LASTEXITCODE -ne 0) { $siloOk = $false; break }
+  }
+  if ($siloOk) {
+    $siloSha = Assert-Sha256 (Join-Path $target "staynest-silo-$stamp.tar.gz.age") (Join-Path $target "staynest-silo-$stamp.tar.gz.age.sha256")
+    Write-Host "OK: $target (dump $($dumpSha.Substring(0, 12))…, silo $($siloSha.Substring(0, 12))…)"
+  } else {
+    $incomplete += $stamp
+    Write-Warning "Дамп $stamp скачан, но архива бакета нет: копия неполная"
+  }
+}
+
+if ($incomplete.Count -gt 0) {
+  throw "Offsite-копия неполная (нет бакета): $($incomplete -join ', ')"
 }
 
 # Ретенция локальной offsite-копии.

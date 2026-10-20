@@ -16,7 +16,7 @@
 #   BACKUP_REMOTE=                     необязательный rclone-путь для копии вне сервера
 set -euo pipefail
 
-REPO_DIR="/opt/staynest"
+REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
 
 # shellcheck disable=SC1091
@@ -40,6 +40,10 @@ if [[ ! -x "$AGE_BIN" || ! -f "$AGE_RECIPIENT_FILE" ]]; then
   echo "Нет age ($AGE_BIN) или recipient-файла ($AGE_RECIPIENT_FILE): бэкап без шифрования запрещён" >&2
   exit 1
 fi
+if ! grep -qE '^age1[0-9a-z]+$' "$AGE_RECIPIENT_FILE"; then
+  echo "В $AGE_RECIPIENT_FILE нет корректного age-публичного ключа" >&2
+  exit 1
+fi
 
 PGUSER="$(grep -E '^POSTGRES_USER=' .env | cut -d= -f2-)"
 PGDB="$(grep -E '^POSTGRES_DB=' .env | cut -d= -f2-)"
@@ -58,7 +62,7 @@ umask 077
 exec 9>"$BACKUP_DIR/.lock"
 if ! flock -n 9; then
   echo "Бэкап уже выполняется" >&2
-  exit 0
+  exit 75
 fi
 
 DUMP_NAME="staynest-$STAMP.dump"
@@ -67,9 +71,12 @@ DUMP_PATH="$DAY_DIR/$DUMP_NAME"
 GLOBALS_PATH="$DAY_DIR/$GLOBALS_NAME"
 PG_TMP="/tmp/$DUMP_NAME"
 RESTORE_DB="${PGDB}_restore_check"
+SILO_ARCHIVE=""
 
 cleanup() {
   docker exec "$PG_CONTAINER" rm -f "$PG_TMP" >/dev/null 2>&1 || true
+  # На любом сбое не оставляем PII в открытом виде.
+  rm -f "$DUMP_PATH" "$GLOBALS_PATH" ${SILO_ARCHIVE:+"$SILO_ARCHIVE"} >/dev/null 2>&1 || true
   if [[ -n "${RESTORE_CREATED:-}" ]]; then
     docker exec "$PG_CONTAINER" psql -U "$PGUSER" -d postgres \
       -c "DROP DATABASE IF EXISTS \"$RESTORE_DB\"" >/dev/null 2>&1 || true
@@ -121,22 +128,21 @@ printf 'users=%s listings=%s bookings=%s\n' "$RESTORED_USERS" "$RESTORED_LISTING
 chmod 600 "$DAY_DIR/$DUMP_NAME.restore-check.txt"
 
 echo "[$(date -u +%FT%TZ)] backup bucket"
-SILO_ARCHIVE=""
-if [[ -n "$SILO_CONTAINER" ]]; then
-  SILO_VOLUME="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}' "$SILO_CONTAINER")"
-  PG_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$PG_CONTAINER")"
-  if [[ -n "$SILO_VOLUME" ]]; then
-    SILO_ARCHIVE="$DAY_DIR/staynest-silo-$STAMP.tar.gz"
-    docker run --rm \
-      -v "$SILO_VOLUME:/data:ro" \
-      -v "$DAY_DIR:/backup" \
-      "$PG_IMAGE" sh -c "tar czf '/backup/staynest-silo-$STAMP.tar.gz' -C /data . && chown $(id -u):$(id -g) '/backup/staynest-silo-$STAMP.tar.gz' && chmod 600 '/backup/staynest-silo-$STAMP.tar.gz'"
-  else
-    echo "Не найден том /data контейнера silo, пропускаю бэкап бакета" >&2
-  fi
-else
-  echo "Контейнер silo не запущен, пропускаю бэкап бакета" >&2
+if [[ -z "$SILO_CONTAINER" ]]; then
+  echo "Контейнер silo не запущен: бэкап без файлов запрещён" >&2
+  exit 1
 fi
+SILO_VOLUME="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}' "$SILO_CONTAINER")"
+if [[ -z "$SILO_VOLUME" ]]; then
+  echo "Не найден том /data контейнера silo: бэкап без файлов запрещён" >&2
+  exit 1
+fi
+PG_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$PG_CONTAINER")"
+SILO_ARCHIVE="$DAY_DIR/staynest-silo-$STAMP.tar.gz"
+docker run --rm \
+  -v "$SILO_VOLUME:/data:ro" \
+  -v "$DAY_DIR:/backup" \
+  "$PG_IMAGE" sh -c "tar czf '/backup/staynest-silo-$STAMP.tar.gz' -C /data . && chown $(id -u):$(id -g) '/backup/staynest-silo-$STAMP.tar.gz' && chmod 600 '/backup/staynest-silo-$STAMP.tar.gz'"
 
 echo "[$(date -u +%FT%TZ)] encrypt"
 encrypt_file "$DUMP_PATH"

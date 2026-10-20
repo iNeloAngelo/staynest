@@ -57,12 +57,14 @@ echo "deployed: $DEPLOYED_SHA (previous: $PREVIOUS_SHA)"
 
 if [[ "${SKIP_PRE_DEPLOY_BACKUP:-0}" != "1" ]]; then
   echo "== pre-deploy backup =="
+  PGUSER="$(grep -E '^POSTGRES_USER=' .env | cut -d= -f2-)"
+  PGDB="$(grep -E '^POSTGRES_DB=' .env | cut -d= -f2-)"
   PG_ID="$("${COMPOSE[@]}" ps -q postgres)"
   status=$(docker inspect --format '{{.State.Health.Status}}' "$PG_ID" 2>/dev/null || echo missing)
   if [[ "$status" != "healthy" ]]; then
-    echo "Postgres не healthy ($status): поднимаю перед бэкапом"
+    echo "Postgres не healthy ($status): поднимаю Postgres и Silo перед бэкапом"
     "${COMPOSE[@]}" down --remove-orphans || true
-    "${COMPOSE[@]}" up -d postgres
+    "${COMPOSE[@]}" up -d postgres silo
     for _ in $(seq 1 40); do
       PG_ID="$("${COMPOSE[@]}" ps -q postgres)"
       status=$(docker inspect --format '{{.State.Health.Status}}' "$PG_ID" 2>/dev/null || echo starting)
@@ -74,9 +76,15 @@ if [[ "${SKIP_PRE_DEPLOY_BACKUP:-0}" != "1" ]]; then
       exit 1
     fi
   fi
-  if ! ./scripts/prod-backup.sh; then
-    echo "Бэкап перед деплоем не удался — выкатка остановлена." >&2
-    exit 1
+  HAS_USERS="$(docker exec "$PG_ID" psql -U "$PGUSER" -d "$PGDB" -tAc "SELECT to_regclass('public.users') IS NOT NULL" 2>/dev/null || echo f)"
+  if [[ "$HAS_USERS" != "t" ]]; then
+    echo "Схема ещё не создана: pre-deploy бэкап пропущен (первый деплой/чистая БД)"
+  else
+    export REPO_DIR="$PWD"
+    if ! ./scripts/prod-backup.sh; then
+      echo "Бэкап перед деплоем не удался — выкатка остановлена." >&2
+      exit 1
+    fi
   fi
 fi
 
@@ -122,6 +130,6 @@ if [[ -n "$DOMAIN" ]]; then
   echo "health: не отвечает. Выкачен $DEPLOYED_SHA, до деплоя был $PREVIOUS_SHA." >&2
   echo "Смотрите: docker compose --env-file .env -f infra/docker-compose.prod.yml logs api caddy" >&2
   echo "Миграции в этом проекте только вперёд: откат кода без восстановления БД неполный (docs/ops.md §7/§11)." >&2
-  echo "Код можно вернуть: DEPLOY_REF=$PREVIOUS_SHA SKIP_PRE_DEPLOY_BACKUP=1 ./scripts/deploy.sh" >&2
+  echo "Код можно вернуть: DEPLOY_REF=$PREVIOUS_SHA ./scripts/deploy.sh" >&2
   exit 1
 fi

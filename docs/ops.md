@@ -23,7 +23,7 @@
 - 2026-10-19: поднят контур `caddy + api + postgres + silo + mailpit` (`infra/docker-compose.prod.yml`, проект `staynest`). Сайт: `https://olivertwist95.clodocd.com`, TLS Let's Encrypt, наружу только 80/443. Фактическое потребление памяти ~275 МБ.
 - 2026-10-19 (С11): в compose добавлен `worker` (тот же образ, `node dist/worker.js`) для pg-boss-джоб бронирования. При следующем деплое контейнеров станет на один больше; схему `pgboss` создаёт сам pg-boss, в миграциях её нет.
 - Postgres слушает только `127.0.0.1:5433`; базы `staynest` и `staynest_test`. С машины разработчика доступ через SSH-туннель (ADR-027), локальный Docker не используется. Секреты в `/opt/staynest/.env` (600, владелец `deploy`).
-- Деплой одной командой: `scripts/deploy.sh` (git pull, сборка, миграции, перезапуск).
+- Деплой одной командой: `scripts/deploy.sh` (fetch, checkout --detach, pre-deploy бэкап, сборка, миграции, перезапуск, health).
 - 2026-10-20 (С17): на стенд выкачены Сессии 5–16, применены миграции `0008`–`0010`, загружены демо-данные (`pnpm seed:demo`: 14 домов, 13 броней, 2 аккаунта). Исправлена раздача `/media` в Caddy: ключ объекта больше не содержит префикс `/media`.
 - 2026-10-20 (С17): контур переведён на три сети — `edge` (только Caddy), `internal` (API, worker, Postgres, Silo, Mailpit, без выхода наружу) и `ops` (только loopback-публикация Postgres и Mailpit). У API, worker и Caddy сброшены capabilities, включены `no-new-privileges`, read-only rootfs и лимиты логов. API и worker работают от пользователя `node`.
 - 2026-10-20 (С17): Postgres доступен только на `127.0.0.1:5433`, Mailpit UI — на `127.0.0.1:8025`. Оба порта смотрятся через SSH-туннель, наружу не публикуются.
@@ -197,7 +197,7 @@ cd /opt/staynest && ./scripts/deploy.sh
 
 Скрипт делает `git fetch` + `checkout --detach` указанной ссылки (по умолчанию `origin/main`), печатает предыдущий и новый commit, делает бэкап, собирает образы, поднимает Postgres, применяет миграции (`node dist/migrate.js` внутри образа API), перезапускает контур и ждёт `{"db":"up"}` от `/health`. Простой на время пересборки и миграции — секунды-десятки секунд.
 
-**Откат.** Миграции в проекте только вперёд: `migrate` умеет `up`, но не `down`. Если релиз не менял схему, можно вернуть код: `DEPLOY_REF=<предыдущий commit> SKIP_PRE_DEPLOY_BACKUP=1 ./scripts/deploy.sh`. Если менял — сначала восстановите БД из pre-deploy бэкапа (раздел 11), затем выкатите старый код. `deploy.sh` при провале health-check печатает предыдущий commit и команду возврата, но сам не откатывается.
+**Откат.** Миграции в проекте только вперёд: `migrate` умеет `up`, но не `down`. Если релиз не менял схему, можно вернуть код: `DEPLOY_REF=<предыдущий commit> ./scripts/deploy.sh`. Если менял — сначала остановите API/worker, восстановите БД из pre-deploy бэкапа (раздел 11.4), затем выкатите старый код. `deploy.sh` при провале health-check печатает предыдущий commit и команду возврата, но сам не откатывается; pre-deploy бэкап всё равно обязателен.
 
 ## 8. Доступ агента к серверу и секреты
 
@@ -350,6 +350,30 @@ cd .. && sha256sum -c server-<timestamp>.tar.gz.sha256
 Ретенция: 7 дневных копий, по воскресеньям — ещё и недельная (хранится 4 недели).
 Каталог `700`, файлы `600`, владелец `deploy`.
 
+**Установка age на сервере.** Статический бинарник кладётся в
+`/home/deploy/bin/age` (без root). Пример для v1.3.2 (сверяйте версию и
+контрольную сумму с релизом):
+
+```bash
+mkdir -p ~/bin ~/backups/staynest
+cd /tmp && curl -fsSLO https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz
+tar xzf age-v1.3.2-linux-amd64.tar.gz
+install -m 755 age/age ~/bin/age
+install -m 755 age/age-keygen ~/bin/age-keygen
+```
+
+Ключ создаётся **на машине владельца**, публичная часть копируется на сервер:
+
+```bash
+age-keygen -o age-identity.txt                  # приватный, хранить только локально
+age-keygen -y age-identity.txt > age-recipient.txt
+scp age-recipient.txt staynest:/home/deploy/backups/staynest/age-recipient.txt
+ssh staynest 'chmod 600 /home/deploy/backups/staynest/age-recipient.txt'
+```
+
+Проверка: `./scripts/prod-backup.sh` должен создать `.dump.age` и не оставить
+рядом `.dump`. На сервере после этого не должно быть `age-identity.txt`.
+
 ### 11.2. Ручной запуск и offsite-копия
 
 ```bash
@@ -409,24 +433,50 @@ sudo systemctl restart staynest-backup.timer staynest-health.timer
 ### 11.4. Восстановление вручную
 
 Приватного ключа на сервере нет, поэтому сначала расшифровываем на машине
-владельца (команда в 11.2), затем передаём plaintext-дамп на сервер:
+владельца (команда в 11.2), затем передаём plaintext-дамп на сервер. Восстановление
+делается в отдельную базу, а не поверх живой:
 
 ```bash
+# 1. Расшифровать локально и передать на сервер
 scp staynest.dump staynest:/home/deploy/restore.dump
+
 ssh staynest
 cd /opt/staynest
-PG=$(docker compose --env-file .env -f infra/docker-compose.prod.yml ps -q postgres)
+COMPOSE=(docker compose --env-file .env -f infra/docker-compose.prod.yml)
+PG=$("${COMPOSE[@]}" ps -q postgres)
 U=$(grep '^POSTGRES_USER=' .env | cut -d= -f2-)
+
+# 2. Остановить приложение, чтобы не писали в БД
+"${COMPOSE[@]}" stop api worker
+
+# 3. Снять текущее состояние на случай отката
+docker exec "$PG" pg_dump -U "$U" -d staynest --format=custom -f /tmp/pre-restore.dump
+docker cp "$PG:/tmp/pre-restore.dump" /home/deploy/backups/pre-restore-$(date -u +%Y%m%dT%H%M%SZ).dump
+
+# 4. Восстановить в новую базу и проверить счётчики
 docker cp /home/deploy/restore.dump "$PG:/tmp/restore.dump"
 docker exec "$PG" createdb -U "$U" staynest_restore
 docker exec "$PG" pg_restore -U "$U" -d staynest_restore --no-owner --exit-on-error /tmp/restore.dump
-# проверить счётчики, затем при необходимости переключить DATABASE_URL на staynest_restore
+docker exec "$PG" psql -U "$U" -d staynest_restore -tAc \
+  "select (select count(*) from users), (select count(*) from listings), (select count(*) from bookings)"
+
+# 5. Переключить базы (имена; соединений приложения уже нет)
+docker exec "$PG" psql -U "$U" -d postgres -v ON_ERROR_STOP=1 \
+  -c 'ALTER DATABASE staynest RENAME TO staynest_old' \
+  -c 'ALTER DATABASE staynest_restore RENAME TO staynest'
+
+# 6. Почистить временные plaintext-файлы и поднять приложение
+docker exec "$PG" rm -f /tmp/restore.dump /tmp/pre-restore.dump
 rm -f /home/deploy/restore.dump
+"${COMPOSE[@]}" up -d api worker
 ```
 
-Бакет: расшифровать `staynest-silo-<stamp>.tar.gz.age`, остановить Silo и
-распаковать архив в том `staynest_silo-data`. Удалить plaintext-архив после
-восстановления.
+Старая база `staynest_old` остаётся для отката; удалить её вручную после
+проверки. Бакет: расшифровать `staynest-silo-<stamp>.tar.gz.age`, остановить
+Silo (`"${COMPOSE[@]}" stop silo`), распаковать архив в том `staynest_silo-data`,
+удалить plaintext-архив и поднять Silo. При восстановлении бакета и БД из
+разных моментов времени возможны фото-сироты/битые ссылки — по возможности
+берите бэкап БД и бакета одного stamp.
 
 
 ## 12. Мониторинг

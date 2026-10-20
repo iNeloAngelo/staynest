@@ -16,4 +16,4 @@ IOSchedulingClass=idle
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
-ReadWritePaths=/home/deploy/backups
+ReadWritePaths=-/home/deploy/backups
