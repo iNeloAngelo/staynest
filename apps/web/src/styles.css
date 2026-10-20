@@ -4,27 +4,110 @@
  * Дизайн-токены из docs/DESIGN.md, раздел 2.
  * Источник правды — этот блок: компоненты не используют «магические» значения.
  */
-@theme {
-  --color-bg: #faf7f2;
-  --color-surface: #ffffff;
-  --color-surface-2: #f3eee6;
-  --color-border: #e7e1d6;
-  --color-border-strong: #8f8775;
-  --color-ink: #1f2a24;
-  --color-ink-muted: #5f6b64;
-  --color-primary: #1f5f4a;
-  --color-primary-hover: #174a3a;
-  --color-on-primary: #ffffff;
-  --color-accent: #e08a2e;
-  --color-on-accent: #1f2a24;
-  --color-success: #2e7d4f;
-  --color-success-ink: #256b43;
-  --color-warning: #b7791f;
-  --color-warning-ink: #8a5a12;
-  --color-danger: #c0392b;
-  --color-info: #2f6b9a;
-  --color-focus: #2f6b9a;
+/*
+ * Цвета вынесены в CSS-переменные как значения `@theme inline`, поэтому
+ * переключение темы меняет их без пересборки Tailwind. Светлая тема — базовая,
+ * тёмная включается по `prefers-color-scheme` или атрибутом `data-theme`.
+ */
+:root {
+  --sn-bg: #faf7f2;
+  --sn-surface: #ffffff;
+  --sn-surface-2: #f3eee6;
+  --sn-border: #e7e1d6;
+  --sn-border-strong: #8f8775;
+  --sn-ink: #1f2a24;
+  --sn-ink-muted: #5f6b64;
+  --sn-primary: #1f5f4a;
+  --sn-primary-hover: #174a3a;
+  --sn-on-primary: #ffffff;
+  --sn-accent: #e08a2e;
+  --sn-on-accent: #1f2a24;
+  --sn-success: #2e7d4f;
+  --sn-success-ink: #256b43;
+  --sn-warning: #b7791f;
+  --sn-warning-ink: #8a5a12;
+  --sn-danger: #c0392b;
+  --sn-on-danger: #ffffff;
+  --sn-info: #2f6b9a;
+  --sn-focus: #2f6b9a;
+  --sn-overlay: rgb(31 42 36 / 0.4);
+}
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --sn-bg: #141a17;
+    --sn-surface: #1c2420;
+    --sn-surface-2: #26302b;
+    --sn-border: #33403a;
+    --sn-border-strong: #6b7a72;
+    --sn-ink: #edeae3;
+    --sn-ink-muted: #a3aea7;
+    --sn-primary: #5fb594;
+    --sn-primary-hover: #7cc9ac;
+    --sn-on-primary: #0e1512;
+    --sn-accent: #f0a04b;
+    --sn-on-accent: #1f2a24;
+    --sn-success: #4caf7d;
+    --sn-success-ink: #8cddb2;
+    --sn-warning: #e0a24a;
+    --sn-warning-ink: #f0c070;
+    --sn-danger: #f06a5e;
+    --sn-on-danger: #2a0f0c;
+    --sn-info: #7fb3d5;
+    --sn-focus: #8cc7f0;
+    --sn-overlay: rgb(0 0 0 / 0.65);
+  }
+}
+
+:root[data-theme='dark'] {
+  --sn-bg: #141a17;
+  --sn-surface: #1c2420;
+  --sn-surface-2: #26302b;
+  --sn-border: #33403a;
+  --sn-border-strong: #6b7a72;
+  --sn-ink: #edeae3;
+  --sn-ink-muted: #a3aea7;
+  --sn-primary: #5fb594;
+  --sn-primary-hover: #7cc9ac;
+  --sn-on-primary: #0e1512;
+  --sn-accent: #f0a04b;
+  --sn-on-accent: #1f2a24;
+  --sn-success: #4caf7d;
+  --sn-success-ink: #8cddb2;
+  --sn-warning: #e0a24a;
+  --sn-warning-ink: #f0c070;
+  --sn-danger: #f06a5e;
+  --sn-on-danger: #2a0f0c;
+  --sn-info: #7fb3d5;
+  --sn-focus: #8cc7f0;
+  --sn-overlay: rgb(0 0 0 / 0.65);
+}
+
+@theme inline {
+  --color-bg: var(--sn-bg);
+  --color-surface: var(--sn-surface);
+  --color-surface-2: var(--sn-surface-2);
+  --color-border: var(--sn-border);
+  --color-border-strong: var(--sn-border-strong);
+  --color-ink: var(--sn-ink);
+  --color-ink-muted: var(--sn-ink-muted);
+  --color-primary: var(--sn-primary);
+  --color-primary-hover: var(--sn-primary-hover);
+  --color-on-primary: var(--sn-on-primary);
+  --color-accent: var(--sn-accent);
+  --color-on-accent: var(--sn-on-accent);
+  --color-success: var(--sn-success);
+  --color-success-ink: var(--sn-success-ink);
+  --color-warning: var(--sn-warning);
+  --color-warning-ink: var(--sn-warning-ink);
+  --color-danger: var(--sn-danger);
+  --color-on-danger: var(--sn-on-danger);
+  --color-info: var(--sn-info);
+  --color-focus: var(--sn-focus);
+  --color-overlay: var(--sn-overlay);
+}
+
+@theme {
   --font-sans: 'Manrope Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-serif: 'Lora Variable', ui-serif, Georgia, serif;
 
@@ -72,6 +155,16 @@
     -webkit-text-size-adjust: 100%;
     color-scheme: light;
     overscroll-behavior: none;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme='light']) {
+      color-scheme: dark;
+    }
   }
 
   body {
@@ -142,6 +235,19 @@
 
 @utility animate-dialog {
   animation: dialog-in var(--duration-panel) var(--ease-out);
+}
+
+@utility animate-page {
+  animation: page-in var(--duration-panel) var(--ease-out);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @utility animate-sheet {

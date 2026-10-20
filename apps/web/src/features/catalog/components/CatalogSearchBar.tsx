@@ -194,7 +194,7 @@ export function CatalogSearchBar({ filters, onChange }: CatalogSearchBarProps) {
     <form
       role="search"
       aria-label={t('catalog.search.label')}
-      className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_minmax(0,0.7fr)_auto] lg:items-end"
+      className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-surface p-4 shadow-sm lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,0.85fr)_minmax(0,0.85fr)_minmax(9.5rem,0.75fr)_auto] lg:items-end"
       onSubmit={(event) => {
         event.preventDefault();
         setDateSubmitted(true);

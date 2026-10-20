@@ -28,7 +28,7 @@ export function FieldShell({ id, label, hint, error, counter, children }: FieldS
       {hint || error || counter ? (
         <div className="flex items-start justify-between gap-3">
           {error ? (
-            <p id={errorId} className="flex items-start gap-1 text-small text-danger">
+            <p id={errorId} role="alert" className="flex items-start gap-1 text-small text-danger">
               <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </p>

@@ -1,4 +1,5 @@
 import type { HostCalendarResponse } from '@staynest/shared';
+import type { TFunction } from 'i18next';
 import { DayPicker } from 'react-day-picker';
 import type { DateRange, ModifiersClassNames } from 'react-day-picker';
 import { enUS, ru as ruLocale } from 'react-day-picker/locale';
@@ -15,24 +16,12 @@ const MODIFIERS: ModifiersClassNames = {
   blocked: '[&>button]:bg-ink-muted/15 [&>button]:text-ink-muted [&>button]:line-through',
 };
 
-export function HostMonthCalendar({
-  calendar,
-  month,
-  selected,
-  onMonthChange,
-  onSelect,
-}: {
-  calendar: HostCalendarResponse;
-  month: Date;
-  selected: DateRange | undefined;
-  onMonthChange: (month: Date) => void;
-  onSelect: (date: Date) => void;
-}) {
-  const { t, i18n } = useTranslation();
-  const language = i18n.language;
-  const modifiers = calendarModifiers(calendar);
-
-  function dayLabel(date: Date, flags: Record<string, boolean>): string {
+function dayLabelFor(
+  calendar: HostCalendarResponse,
+  language: string,
+  t: TFunction,
+): (date: Date, flags: Record<string, boolean>) => string {
+  return (date, flags) => {
     const iso = formatIsoDateLocal(date);
     const afterWindow = iso > calendar.to;
     const status = flags.pending
@@ -50,31 +39,51 @@ export function HostMonthCalendar({
                 : t('booking.dayAvailable');
 
     return `${formatLongDate(iso, language)}, ${status}`;
-  }
+  };
+}
+
+export function HostMonthCalendar({
+  calendar,
+  month,
+  selected,
+  onMonthChange,
+  onSelect,
+}: {
+  calendar: HostCalendarResponse;
+  month: Date;
+  selected: DateRange | undefined;
+  onMonthChange: (month: Date) => void;
+  onSelect: (date: Date) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.language;
+  const modifiers = calendarModifiers(calendar);
+  const dayLabel = dayLabelFor(calendar, language, t);
 
   return (
-    <DayPicker
-      mode="range"
-      selected={selected}
-      onSelect={(_range, triggerDate) => onSelect(triggerDate)}
-      month={month}
-      onMonthChange={onMonthChange}
-      weekStartsOn={1}
-      showOutsideDays
-      fixedWeeks
-      locale={language.startsWith('en') ? enUS : ruLocale}
-      lang={language}
-      aria-label={t('hostCalendar.calendarLabel')}
-      classNames={calendarClassNames}
-      modifiers={modifiers}
-      modifiersClassNames={MODIFIERS}
-      today={parseIsoDateLocal(calendar.today)}
-      disabled={[
-        { before: parseIsoDateLocal(calendar.today) },
-        { after: parseIsoDateLocal(calendar.to) },
-      ]}
-      endMonth={parseIsoDateLocal(calendar.to)}
-      labels={{ labelDayButton: dayLabel }}
-    />
+    <div role="group" aria-label={t('hostCalendar.calendarLabel')}>
+      <DayPicker
+        mode="range"
+        selected={selected}
+        onSelect={(_range, triggerDate) => onSelect(triggerDate)}
+        month={month}
+        onMonthChange={onMonthChange}
+        weekStartsOn={1}
+        showOutsideDays
+        fixedWeeks
+        locale={language.startsWith('en') ? enUS : ruLocale}
+        lang={language}
+        classNames={calendarClassNames}
+        modifiers={modifiers}
+        modifiersClassNames={MODIFIERS}
+        today={parseIsoDateLocal(calendar.today)}
+        disabled={[
+          { before: parseIsoDateLocal(calendar.today) },
+          { after: parseIsoDateLocal(calendar.to) },
+        ]}
+        endMonth={parseIsoDateLocal(calendar.to)}
+        labels={{ labelDayButton: dayLabel }}
+      />
+    </div>
   );
 }

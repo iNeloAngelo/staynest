@@ -12,6 +12,7 @@ import {
   ProfileForm,
   useLocalePreference,
 } from '../../features/profile';
+import { useTheme } from '../../shared/lib/theme';
 import { Badge, Button, Select, useToast } from '../../shared/ui';
 
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
@@ -47,6 +48,7 @@ function AccountCard({ user }: { user: UserDto }) {
 function SettingsCard() {
   const { t } = useTranslation();
   const { locale, changeLocale, pending } = useLocalePreference();
+  const { preference, setPreference } = useTheme();
 
   return (
     <section className="flex flex-col gap-5 rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6">
@@ -60,6 +62,18 @@ function SettingsCard() {
         options={[
           { value: 'ru', label: t('profile.languageRu') },
           { value: 'en', label: t('profile.languageEn') },
+        ]}
+      />
+
+      <Select
+        label={t('profile.theme')}
+        hint={t('profile.themeHint')}
+        value={preference}
+        onChange={(event) => setPreference(event.target.value as typeof preference)}
+        options={[
+          { value: 'system', label: t('profile.themeSystem') },
+          { value: 'light', label: t('profile.themeLight') },
+          { value: 'dark', label: t('profile.themeDark') },
         ]}
       />
 

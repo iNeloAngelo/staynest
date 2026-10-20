@@ -73,15 +73,17 @@ export function AppLayout() {
       <UpdateBanner />
       <InstallBanner />
 
-      <div className="mx-auto w-full max-w-page px-4 pt-3 lg:hidden">
+      <nav aria-label={t('mode.label')} className="mx-auto w-full max-w-page px-4 pt-3 lg:hidden">
         <ModeSwitchControl fullWidth />
-      </div>
+      </nav>
 
       <main
         id="main"
         className="mx-auto w-full max-w-page flex-1 px-4 py-6 pb-nav lg:px-8 lg:py-10"
       >
-        <Outlet />
+        <div key={location.pathname} className="animate-page">
+          <Outlet />
+        </div>
       </main>
 
       <BottomNav items={items} label={t('nav.mainLabel')} />

@@ -149,7 +149,7 @@ export function DialogShell({
         tabIndex={-1}
         aria-label={t('ui.modal.close')}
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-ink/40"
+        className="absolute inset-0 cursor-default bg-overlay"
       />
 
       <div

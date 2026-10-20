@@ -59,30 +59,31 @@ export function BookingCalendar({
   }
 
   return (
-    <DayPicker
-      mode="range"
-      selected={selected}
-      onSelect={(_range, triggerDate) => onSelect(triggerDate)}
-      month={month}
-      onMonthChange={onMonthChange}
-      numberOfMonths={numberOfMonths}
-      weekStartsOn={1}
-      showOutsideDays
-      fixedWeeks
-      locale={language.startsWith('en') ? enUS : ruLocale}
-      lang={language}
-      aria-label={t('booking.calendarLabel')}
-      classNames={calendarClassNames}
-      modifiers={{ booked, blocked }}
-      modifiersClassNames={calendarModifiersClassNames}
-      startMonth={parseIsoDateLocal(calendar.today)}
-      endMonth={parseIsoDateLocal(calendar.to)}
-      today={parseIsoDateLocal(calendar.today)}
-      disabled={[
-        { before: parseIsoDateLocal(calendar.today) },
-        { after: parseIsoDateLocal(calendar.to) },
-      ]}
-      labels={{ labelDayButton: dayLabel }}
-    />
+    <div role="group" aria-label={t('booking.calendarLabel')}>
+      <DayPicker
+        mode="range"
+        selected={selected}
+        onSelect={(_range, triggerDate) => onSelect(triggerDate)}
+        month={month}
+        onMonthChange={onMonthChange}
+        numberOfMonths={numberOfMonths}
+        weekStartsOn={1}
+        showOutsideDays
+        fixedWeeks
+        locale={language.startsWith('en') ? enUS : ruLocale}
+        lang={language}
+        classNames={calendarClassNames}
+        modifiers={{ booked, blocked }}
+        modifiersClassNames={calendarModifiersClassNames}
+        startMonth={parseIsoDateLocal(calendar.today)}
+        endMonth={parseIsoDateLocal(calendar.to)}
+        today={parseIsoDateLocal(calendar.today)}
+        disabled={[
+          { before: parseIsoDateLocal(calendar.today) },
+          { after: parseIsoDateLocal(calendar.to) },
+        ]}
+        labels={{ labelDayButton: dayLabel }}
+      />
+    </div>
   );
 }

@@ -62,8 +62,8 @@ export function BookingTabs<T extends string>({
           onClick={() => onChange(tab.id)}
           className={
             tab.id === active
-              ? 'inline-flex min-h-11 shrink-0 items-center rounded-full bg-primary px-4 text-small font-semibold text-on-primary'
-              : 'inline-flex min-h-11 shrink-0 items-center rounded-full bg-surface-2 px-4 text-small font-medium text-ink-muted hover:text-ink'
+              ? 'inline-flex min-h-11 shrink-0 items-center rounded-full bg-primary px-2 text-small font-semibold text-on-primary'
+              : 'inline-flex min-h-11 shrink-0 items-center rounded-full bg-surface-2 px-2 text-small font-medium text-ink-muted hover:text-ink'
           }
         >
           {tab.label}
