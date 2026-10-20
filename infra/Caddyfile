@@ -45,15 +45,28 @@
 		reverse_proxy api:3100
 	}
 
-	# Раздача файлов из бакета. Публичный доступ ограничен политикой бакета
-	# (listings/*/*/*.webp и avatars/*/*.webp); остальные ключи Silo отклонит.
-	handle_path /media/* {
+	# Раздача файлов из бакета. Публичный доступ ограничен политикой бакета;
+	# Caddy дополнительно пропускает только listings/ и avatars/.
+	handle_path /media/listings/* {
 		@notAllowed not method GET HEAD
 		respond @notAllowed 405
-		rewrite * /{$S3_BUCKET:staynest-media}{path}
+		rewrite * /{$S3_BUCKET:staynest-media}/listings{path}
 		reverse_proxy silo:9000
 		header Cache-Control "public, max-age=31536000, immutable"
 		header X-Content-Type-Options "nosniff"
+	}
+
+	handle_path /media/avatars/* {
+		@notAllowed not method GET HEAD
+		respond @notAllowed 405
+		rewrite * /{$S3_BUCKET:staynest-media}/avatars{path}
+		reverse_proxy silo:9000
+		header Cache-Control "public, max-age=31536000, immutable"
+		header X-Content-Type-Options "nosniff"
+	}
+
+	handle /media/* {
+		respond 404
 	}
 
 	# SSE требует отключённой буферизации, иначе события копятся в прокси.

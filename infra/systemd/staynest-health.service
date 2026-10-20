@@ -2,7 +2,7 @@
 Description=StayNest healthcheck (/health, containers, disk, backups)
 Documentation=file:///opt/staynest/docs/ops.md
 After=docker.service
-Requires=docker.service
+Wants=docker.service
 
 [Service]
 Type=oneshot
@@ -10,3 +10,7 @@ User=deploy
 Group=deploy
 WorkingDirectory=/opt/staynest
 ExecStart=/bin/bash /opt/staynest/scripts/prod-healthcheck.sh
+TimeoutStartSec=120
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full

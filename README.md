@@ -27,10 +27,13 @@ PWA для аренды домов: хозяин создаёт объявлен
 cp .env.example .env        # Windows PowerShell: Copy-Item .env.example .env
 pnpm install
 pnpm infra:up               # Postgres, Silo (S3), Mailpit (нужен локальный Docker)
-pnpm db:reset               # схема + справочник удобств
+pnpm db:reset               # ВНИМАНИЕ: удаляет схему и данные в DATABASE_URL
 pnpm seed:demo              # 14 домов, фото, брони и два демо-аккаунта
 pnpm dev                    # API :3100 и web :5173
 ```
+
+> `pnpm db:reset` разрушительный: он пересоздаёт схему в базе из `DATABASE_URL`
+> и удаляет данные. На уже настроенной базе используйте `pnpm db:migrate`.
 
 Демо-аккаунты после `pnpm seed:demo`:
 

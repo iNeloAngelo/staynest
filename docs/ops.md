@@ -38,7 +38,7 @@
 - VPS: Ubuntu 24.04 LTS, 2 vCPU, 2–4 ГБ RAM, 40+ ГБ SSD.
 - Пользователь `deploy` без root, вход по SSH-ключу, root-логин и пароли отключены.
 - Docker Engine + Compose plugin; рабочая папка `/opt/staynest`.
-- `infra/docker-compose.prod.yml`: `caddy`, `api`, `worker`, `postgres`, `minio` (S3-совместимый Silo, см. ADR-021).
+- `infra/docker-compose.prod.yml`: `caddy`, `api`, `worker`, `postgres`, `silo` (S3-совместимый Silo, см. ADR-021).
 - Caddy: автоматический TLS, заголовки безопасности, `flush_interval -1` для SSE.
 - Firewall: 22/80/443 + fail2ban + unattended-upgrades.
 - Бэкап: ежедневный `pg_dump` с ротацией, копия вне сервера, бэкап S3-бакета, **проверенное** восстановление.
@@ -137,11 +137,15 @@ timedatectl set-timezone UTC
 adduser --disabled-password --gecos "" deploy
 usermod -aG sudo deploy
 # SSH-ключ владельца в /home/deploy/.ssh/authorized_keys (права 700/600)
-# В /etc/ssh/sshd_config.d/99-hardening.conf:
+# В /etc/ssh/sshd_config.d/00-staynest.conf (первый файл побеждает!):
 #   PermitRootLogin no
 #   PasswordAuthentication no
 #   PubkeyAuthentication yes
+#   X11Forwarding no
+#   AllowAgentForwarding no
+#   AllowTcpForwarding local
 systemctl restart ssh
+# Проверка: sshd -T | grep -E 'permitrootlogin|passwordauthentication|allowtcpforwarding'
 ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
 apt install -y fail2ban unattended-upgrades
 # Docker Engine + compose plugin по официальной инструкции, затем:
@@ -155,11 +159,33 @@ mkdir -p /opt/staynest && chown deploy:deploy /opt/staynest
 
 Стенд уже работает: `https://olivertwist95.clodocd.com`. Код лежит в `/opt/staynest`, вход по SSH-ключу пользователем `deploy`, доступ к GitHub — через read-only deploy key (`~deploy/.ssh/github_deploy`), к Docker — через группу `docker`.
 
-1. Код на сервере: `git pull --ff-only` в `/opt/staynest` (или `DEPLOY_REF=v1.2.3 ./scripts/deploy.sh` для тега).
-2. `.env` лежит рядом с репозиторием (права `600`, владелец `deploy`): `NODE_ENV=production`, `TRUST_PROXY=true`, `DOMAIN`, `DATABASE_URL` с хостом `postgres`, `CORS_ORIGINS` с HTTPS-доменом, `JWT_SECRET` (не короче 32 символов, генерируется `openssl rand -base64 48`), `SMTP_HOST` (в compose это `mailpit`), `SMTP_PORT=1025`, `APP_WEB_URL` с HTTPS-доменом. Для Web Push добавьте `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (сгенерировать: `pnpm vapid:generate`) и `VAPID_SUBJECT`. API и S3 наружу не публикуются.
-   В production API не стартует без `JWT_SECRET`, `SMTP_HOST`, `DATABASE_URL`, `CORS_ORIGINS`, `APP_WEB_URL` и при `REQUIRE_EMAIL_VERIFICATION=false`. На стенде `REQUIRE_EMAIL_VERIFICATION=true`.
-3. Сборка образов, миграции **отдельной командой**, затем `docker compose up -d`.
-4. Проверка: `/health` отвечает `ok` с `db: up`, сайт по HTTPS, демо-сценарий.
+1. Код на сервере всегда выкатывается скриптом: `./scripts/deploy.sh` (origin/main) или `DEPLOY_REF=v1.2.3 ./scripts/deploy.sh` (тег/ветка/коммит). Скрипт сам делает `git fetch` + `checkout --detach`, поэтому ручной `git pull --ff-only` на стенде не используется: после CI-выкатки репозиторий намеренно в detached HEAD.
+2. `.env` лежит рядом с репозиторием (права `600`, владелец `deploy`). Полный минимум для production:
+
+```dotenv
+NODE_ENV=production
+DOMAIN=example.com
+TRUST_PROXY=true
+DATABASE_URL=postgres://staynest:<пароль>@postgres:5432/staynest
+POSTGRES_USER=staynest
+POSTGRES_PASSWORD=<пароль>
+POSTGRES_DB=staynest
+CORS_ORIGINS=https://example.com
+APP_WEB_URL=https://example.com
+JWT_SECRET=<openssl rand -base64 48>
+REQUIRE_EMAIL_VERIFICATION=true
+SMTP_HOST=mailpit
+SMTP_PORT=1025
+S3_ENDPOINT=http://silo:9000
+S3_BUCKET=staynest-media
+MINIO_ROOT_USER=staynest
+MINIO_ROOT_PASSWORD=<пароль>
+# VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT — по желанию
+```
+
+`.env.example` — только dev-шаблон: значения `staynest`/`staynest-minio` и `S3_ENDPOINT=http://localhost:9000` в production недопустимы, внутри compose S3-хост — `silo`.
+3. Сборка образов, миграции **отдельной командой**, затем `docker compose up -d`. Перед сборкой `deploy.sh` автоматически делает свежий зашифрованный бэкап (раздел 11); при неудачном бэкапе выкатка останавливается.
+4. Проверка: `/api/v1/health` отвечает `ok` с `db: up`, сайт по HTTPS, демо-сценарий.
 5. Бэкап-джоб и проверенное восстановление — раздел 11.
 
 Выкатка одной командой:
@@ -169,7 +195,9 @@ ssh staynest
 cd /opt/staynest && ./scripts/deploy.sh
 ```
 
-Скрипт делает `git pull` (или `git checkout --force` указанного `DEPLOY_REF`), сборку, поднимает Postgres, применяет миграции (`node dist/migrate.js` внутри образа API), перезапускает контур и ждёт `{"db":"up"}` от `/health`. Простой на время пересборки и миграции — секунды-десятки секунд; откат — повторный запуск с `DEPLOY_REF=<предыдущий тег>`.
+Скрипт делает `git fetch` + `checkout --detach` указанной ссылки (по умолчанию `origin/main`), печатает предыдущий и новый commit, делает бэкап, собирает образы, поднимает Postgres, применяет миграции (`node dist/migrate.js` внутри образа API), перезапускает контур и ждёт `{"db":"up"}` от `/health`. Простой на время пересборки и миграции — секунды-десятки секунд.
+
+**Откат.** Миграции в проекте только вперёд: `migrate` умеет `up`, но не `down`. Если релиз не менял схему, можно вернуть код: `DEPLOY_REF=<предыдущий commit> SKIP_PRE_DEPLOY_BACKUP=1 ./scripts/deploy.sh`. Если менял — сначала восстановите БД из pre-deploy бэкапа (раздел 11), затем выкатите старый код. `deploy.sh` при провале health-check печатает предыдущий commit и команду возврата, но сам не откатывается.
 
 ## 8. Доступ агента к серверу и секреты
 
@@ -224,7 +252,10 @@ ssh-add "$env:USERPROFILE\.ssh\staynest_deploy"   # спросит пароль 
 В `~/.ssh/authorized_keys` ключ можно ограничить:
 
 ```
-from="ВАШ.IP.АДРЕС",no-agent-forwarding,no-port-forwarding,no-x11-forwarding ssh-ed25519 AAAA... staynest-deploy
+# CI-ключ: только деплой, без туннелей
+from="IP-РАННЕРА",no-agent-forwarding,no-port-forwarding,no-x11-forwarding ssh-ed25519 AAAA... staynest-ci
+# Ключ оператора: нужны -L 5433 и -L 8025, поэтому port-forwarding разрешён
+from="ВАШ.IP.АДРЕС",no-agent-forwarding,no-x11-forwarding ssh-ed25519 AAAA... staynest-deploy
 ```
 
 Для первичной очистки обычно нужен `root` или пользователь с `sudo`/`docker`. После очистки:
@@ -243,9 +274,14 @@ from="ВАШ.IP.АДРЕС",no-agent-forwarding,no-port-forwarding,no-x11-forwar
 
 История чата и логи терминала — **не хранилище секретов**. Если ключ или пароль всё же попали в переписку, они считаются скомпрометированными: ключ перевыпускается, пароль меняется.
 
-## 9. Бэкап сервера перед миграцией
+## 9. Бэкап сервера перед миграцией (историческое)
 
-`scripts/server-backup.sh` делает переносимый логический бэкап, не останавливая сервисы:
+Этот раздел относится к переносу старого сервера (n8n) и оставлен для истории.
+После Сессии 17 root-SSH закрыт, поэтому команды с `/root` больше не работают;
+для аварийного доступа используйте панель провайдера. Для регулярных бэкапов
+StayNest используйте раздел 11.
+
+`scripts/server-backup.sh` делает переносимый логический бэкап, не останавливая сервисы (запускался от root до закрытия root-доступа):
 
 ```bash
 scp scripts/server-backup.sh staynest:/root/server-backup.sh
@@ -290,16 +326,26 @@ cd .. && sha256sum -c server-<timestamp>.tar.gz.sha256
 
 | Артефакт | Формат | Путь |
 |---|---|---|
-| База `staynest` | `pg_dump --format=custom -Z6` | `/home/deploy/backups/staynest/daily/staynest-<stamp>.dump` |
-| Роли и настройки | `pg_dumpall --globals-only` | рядом, `staynest-globals-<stamp>.sql` |
-| Бакет Silo | `tar.gz` тома `/data` | `staynest-silo-<stamp>.tar.gz` |
-| Контрольные суммы | SHA-256 | `*.sha256` |
-| Результат restore-check | счётчики строк | `*.restore-check.txt` |
+| База `staynest` | `pg_dump --format=custom -Z6`, затем age | `/home/deploy/backups/staynest/daily/staynest-<stamp>.dump.age` |
+| Роли и настройки | `pg_dumpall --globals-only`, затем age | `staynest-globals-<stamp>.sql.age` |
+| Бакет Silo | `tar.gz` тома `/data`, затем age | `staynest-silo-<stamp>.tar.gz.age` |
+| Контрольные суммы | SHA-256 от `.age` | `*.sha256` |
+| Результат restore-check | счётчики строк (без PII) | `*.restore-check.txt` |
 
-Скрипт сам делает `pg_restore --list`, восстанавливает дамп в отдельную базу
+Скрипт делает `pg_restore --list`, восстанавливает дамп в отдельную базу
 `staynest_restore_check`, сравнивает количество `users`, `listings`, `bookings`
-с рабочей базой и только потом удаляет проверочную базу. Если счётчики
-разошлись, бэкап считается неудачным (exit 1).
+с рабочей базой и удаляет проверочную базу. Если счётчики разошлись, бэкап
+считается неудачным (exit 1). **Шифрование** выполняется после restore-check:
+`age` публичным ключом из `/home/deploy/backups/staynest/age-recipient.txt`;
+незашифрованные `.dump`/`.sql`/`.tar.gz` удаляются. Без `age` или recipient-файла
+скрипт падает, а не оставляет PII на диске.
+
+**Ключи.** Публичный ключ лежит на сервере (`age-recipient.txt`, 600).
+Приватный `age-identity.txt` хранится **только вне сервера**, у владельца
+(`C:\Users\User\staynest-backups\age-identity.txt`, ACL только для пользователя).
+На сервере его нет — компрометация VPS не даёт расшифровать архив. Потеря
+приватного ключа означает потерю всех бэкапов, поэтому ключ нужно продублировать
+в менеджере паролей/офлайн-хранилище.
 
 Ретенция: 7 дневных копий, по воскресеньям — ещё и недельная (хранится 4 недели).
 Каталог `700`, файлы `600`, владелец `deploy`.
@@ -319,56 +365,82 @@ systemctl list-timers | grep staynest
 powershell -File scripts/pull-backups.ps1
 ```
 
-После изменения юнитов в `infra/systemd/` их нужно установить заново (от пользователя с sudo):
+Скрипт скачивает зашифрованные дамп, globals, бэкап бакета, restore-check и
+SHA-256, проверяет **обе** контрольные суммы и кладёт всё в
+`C:\Users\User\staynest-backups\<stamp>`. Ошибка `scp` или отсутствие любого
+артефакта — это ошибка, а не «готово». Старые локальные копии старше 30 дней
+удаляются; приватный age-ключ не удаляется.
+
+Расшифровка (age для Windows лежит в
+`C:\Users\User\staynest-backups\tools\age\age\age.exe`):
+
+```powershell
+$age = "$env:USERPROFILE\staynest-backups\tools\age\age\age.exe"
+$key = "$env:USERPROFILE\staynest-backups\age-identity.txt"
+& $age -d -i $key -o staynest.dump .\<stamp>\staynest-<stamp>.dump.age
+```
+
+Для регулярной offsite-копии можно указать `BACKUP_REMOTE` в
+`/etc/staynest/backup.env` и установить `rclone`; скрипт скопирует `.age`-файлы
+в удалённое хранилище. Для ротации удалённых копий настройте lifecycle policy
+у провайдера (скрипт remote-объекты не удаляет).
+
+После изменения юнитов в `infra/systemd/` их нужно установить заново (от
+пользователя с sudo) и включить автозапуск:
 
 ```bash
 sudo install -m 644 infra/systemd/staynest-*.service infra/systemd/staynest-*.timer /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl restart staynest-backup.timer staynest-health.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now staynest-backup.timer staynest-health.timer
+sudo systemctl restart staynest-backup.timer staynest-health.timer
 ```
-
-Скрипт скачивает последний дамп, globals, бэкап бакета и SHA-256, проверяет
-контрольную сумму и кладёт всё в `C:\Users\User\staynest-backups\<stamp>`.
-Для регулярной offsite-копии можно указать `BACKUP_REMOTE` в
-`/etc/staynest/backup.env` и установить `rclone`; тогда скрипт сам скопирует
-архив в удалённое хранилище.
 
 ### 11.3. Проверка 2026-10-20
 
 - Бэкап создан: `staynest-20261020T114242Z.dump` (116 КБ) и
-  `staynest-silo-20261020T114242Z.tar.gz` (7.0 МБ).
+  `staynest-silo-20261020T114242Z.tar.gz` (7.0 МБ); после включения age
+  артефакты шифруются в `.dump.age` / `.tar.gz.age`.
 - Restore-check: `users=9 listings=17 bookings=13` — совпало с рабочей базой.
-- Offsite-копия скачана на Windows, SHA-256 сошёлся.
+- Offsite-копия скачана на Windows, SHA-256 дампа и бакета сошлись.
 - Дамп из offsite-копии восстановлен на сервере в отдельную базу
   `staynest_offsite_check`: `9 users, 17 listings, 13 bookings`. База удалена
   после проверки.
 
 ### 11.4. Восстановление вручную
 
+Приватного ключа на сервере нет, поэтому сначала расшифровываем на машине
+владельца (команда в 11.2), затем передаём plaintext-дамп на сервер:
+
 ```bash
+scp staynest.dump staynest:/home/deploy/restore.dump
 ssh staynest
 cd /opt/staynest
 PG=$(docker compose --env-file .env -f infra/docker-compose.prod.yml ps -q postgres)
 U=$(grep '^POSTGRES_USER=' .env | cut -d= -f2-)
-docker cp /home/deploy/backups/staynest/daily/staynest-<stamp>.dump "$PG:/tmp/restore.dump"
+docker cp /home/deploy/restore.dump "$PG:/tmp/restore.dump"
 docker exec "$PG" createdb -U "$U" staynest_restore
 docker exec "$PG" pg_restore -U "$U" -d staynest_restore --no-owner --exit-on-error /tmp/restore.dump
 # проверить счётчики, затем при необходимости переключить DATABASE_URL на staynest_restore
+rm -f /home/deploy/restore.dump
 ```
 
-Бакет восстанавливается распаковкой `staynest-silo-<stamp>.tar.gz` в том
-`staynest_silo-data` (контейнер Silo предварительно остановить).
+Бакет: расшифровать `staynest-silo-<stamp>.tar.gz.age`, остановить Silo и
+распаковать архив в том `staynest_silo-data`. Удалить plaintext-архив после
+восстановления.
+
 
 ## 12. Мониторинг
 
 - `GET /api/v1/health` возвращает `{"status":"ok","db":"up"}`; Caddy и API
-  имеют Docker healthcheck, при падении контейнер перезапускается политикой
-  `unless-stopped`.
+  имеют Docker healthcheck. Docker перезапускает контейнер по exit-коду
+  (`restart: unless-stopped`), а «unhealthy, но живой» контейнер ловит
+  `staynest-health.timer`, а не Docker.
 - `staynest-health.timer` каждые 5 минут запускает `scripts/prod-healthcheck.sh`:
-  проверяет `/health`, наличие всех шести контейнеров, занятость диска (порог 85%)
-  и свежесть последнего бэкапа (порог 26 часов).
+  проверяет `/api/v1/health`, наличие всех шести контейнеров, занятость диска
+  (порог 85%) и свежесть последнего зашифрованного бэкапа (порог 26 часов).
 - Ошибки пишутся в journal (`journalctl -u staynest-health.service`) и, если в
   `/etc/staynest/health.env` задан `HEALTHCHECK_WEBHOOK_URL`, отправляются POST-ом
-  в webhook (Slack/Discord/свой обработчик).
+  с полем `text` (Slack-совместимый формат; для Discord нужен свой маппинг).
 - Логи контейнеров ограничены `json-file` 10 МБ × 3 файла на сервис.
 - Просмотр: `docker compose --env-file .env -f infra/docker-compose.prod.yml logs -f api worker caddy`.
 
@@ -381,9 +453,17 @@ docker exec "$PG" pg_restore -U "$U" -d staynest_restore --no-owner --exit-on-er
 
 Секреты репозитория: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`,
 `DEPLOY_SSH_KEY` (отдельный ключ `staynest-ci`, добавленный в
-`~deploy/.ssh/authorized_keys`), `DEPLOY_URL`. Workflow подключается по SSH,
-запускает `DEPLOY_REF=<ref> ./scripts/deploy.sh` и проверяет `/health`.
-Откат — запуск workflow с предыдущим тегом.
+`~deploy/.ssh/authorized_keys`), `DEPLOY_KNOWN_HOSTS` (публичный host key
+сервера, снятый один раз с панели/по проверенному каналу, не `ssh-keyscan` в
+раннере) и `DEPLOY_URL`. Workflow подключается по SSH со
+`StrictHostKeyChecking=yes`, запускает `DEPLOY_REF=<ref> ./scripts/deploy.sh`,
+который сначала делает свежий бэкап, и проверяет `/api/v1/health`.
+
+Тег должен указывать на commit, у которого зелёный `ci.yml`; workflow деплоя
+запускается параллельно CI и не ждёт его. Откат: если схема не менялась —
+запустить workflow с предыдущим тегом/коммитом; если менялась — сначала
+восстановить pre-deploy бэкап (раздел 11), потом выкатить старый код. Полный
+rollback с миграциями не автоматизирован намеренно, чтобы не откатить данные.
 
 `ci.yml` по-прежнему запускается на каждый push и PR: lint, types, tests,
 сборка, gitleaks, audit.

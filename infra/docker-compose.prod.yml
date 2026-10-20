@@ -84,6 +84,7 @@ services:
       - '3100'
     networks:
       - internal
+      - egress
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,6 +124,7 @@ services:
       APP_WEB_URL: https://${DOMAIN:?DOMAIN is required}
     networks:
       - internal
+      - egress
     depends_on:
       postgres:
         condition: service_healthy
@@ -212,7 +214,13 @@ networks:
   edge:
   internal:
     internal: true
+  # Egress для API/worker: Web Push и внешний SMTP. Портов наружу нет.
+  egress:
   ops:
+    driver_opts:
+      # Loopback-публикация работает без NAT; запрещаем egress с ops-сети,
+      # чтобы Postgres/Mailpit не могли ходить в интернет.
+      com.docker.network.bridge.enable_ip_masquerade: 'false'
 
 volumes:
   postgres-data:

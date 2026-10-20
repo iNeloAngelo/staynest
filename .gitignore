@@ -28,6 +28,11 @@ dev-dist/
 cookies.txt
 *.cookies.txt
 tmp/
+backups/
+*.dump
+*.dump.age
+*.tar.gz
+*.tar.gz.age
 .playwright/
 test-results/
 playwright-report/

@@ -42,7 +42,10 @@ if [[ -n "$DISK_USED" && "$DISK_USED" -ge 85 ]]; then
   problems+=("диск занят на ${DISK_USED}%")
 fi
 
-NEWEST_BACKUP="$(find "$BACKUP_DIR/daily" -maxdepth 1 -name 'staynest-*.dump' -printf '%T@\n' 2>/dev/null | sort -n | tail -1 | cut -d. -f1)"
+NEWEST_BACKUP=""
+if [[ -d "$BACKUP_DIR/daily" ]]; then
+  NEWEST_BACKUP="$(find "$BACKUP_DIR/daily" -maxdepth 1 -name 'staynest-*.dump.age' -printf '%T@\n' 2>/dev/null | sort -n | tail -1 | cut -d. -f1)"
+fi
 if [[ -z "$NEWEST_BACKUP" ]]; then
   problems+=("нет ни одного бэкапа в $BACKUP_DIR/daily")
 else
