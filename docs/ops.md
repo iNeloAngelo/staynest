@@ -2,7 +2,6 @@
 
 Документ описывает подготовку сервера, очистку от старого содержимого, деплой, бэкапы и восстановление.
 Обновляется в Сессии 17; раздел про очистку актуален с самого начала.
-
 ## 1. Принципы
 
 1. **Сначала смотрим, потом удаляем.** Любое удаление — только после отчёта инвентаризации и явного подтверждения владельца.
@@ -25,6 +24,12 @@
 - 2026-10-19 (С11): в compose добавлен `worker` (тот же образ, `node dist/worker.js`) для pg-boss-джоб бронирования. При следующем деплое контейнеров станет на один больше; схему `pgboss` создаёт сам pg-boss, в миграциях её нет.
 - Postgres слушает только `127.0.0.1:5433`; базы `staynest` и `staynest_test`. С машины разработчика доступ через SSH-туннель (ADR-027), локальный Docker не используется. Секреты в `/opt/staynest/.env` (600, владелец `deploy`).
 - Деплой одной командой: `scripts/deploy.sh` (git pull, сборка, миграции, перезапуск).
+- 2026-10-20 (С17): на стенд выкачены Сессии 5–16, применены миграции `0008`–`0010`, загружены демо-данные (`pnpm seed:demo`: 14 домов, 13 броней, 2 аккаунта). Исправлена раздача `/media` в Caddy: ключ объекта больше не содержит префикс `/media`.
+- 2026-10-20 (С17): контур переведён на три сети — `edge` (только Caddy), `internal` (API, worker, Postgres, Silo, Mailpit, без выхода наружу) и `ops` (только loopback-публикация Postgres и Mailpit). У API, worker и Caddy сброшены capabilities, включены `no-new-privileges`, read-only rootfs и лимиты логов. API и worker работают от пользователя `node`.
+- 2026-10-20 (С17): Postgres доступен только на `127.0.0.1:5433`, Mailpit UI — на `127.0.0.1:8025`. Оба порта смотрятся через SSH-туннель, наружу не публикуются.
+- 2026-10-20 (С17): root-доступ по SSH закрыт (`PermitRootLogin no`), вход только пользователем `deploy` по ключу. `fail2ban`, UFW (22/80/443), `unattended-upgrades` активны. Внешняя проверка `check-host.net` подтвердила, что 5432/5433/8025/9000/3100 снаружи закрыты.
+- 2026-10-20 (С17): ежедневный бэкап БД и бакета настроен systemd-таймером, проверка восстановления и offsite-копия выполнены (раздел 11). Мониторинг `/health` — таймер каждые 5 минут (раздел 12).
+- 2026-10-20 (С17): CI/CD выкатывает тег `v*` или кнопку `workflow_dispatch` (раздел 13). Секреты `DEPLOY_*` добавлены в GitHub Actions.
 
 ## 2. Целевая конфигурация
 
@@ -150,21 +155,21 @@ mkdir -p /opt/staynest && chown deploy:deploy /opt/staynest
 
 Стенд уже работает: `https://olivertwist95.clodocd.com`. Код лежит в `/opt/staynest`, вход по SSH-ключу пользователем `deploy`, доступ к GitHub — через read-only deploy key (`~deploy/.ssh/github_deploy`), к Docker — через группу `docker`.
 
-1. Код на сервере: `git pull --ff-only` в `/opt/staynest`.
-2. `.env` лежит рядом с репозиторием (права `600`, владелец `deploy`): `NODE_ENV=production`, `TRUST_PROXY=true`, `DOMAIN`, `DATABASE_URL` с хостом `postgres`, `CORS_ORIGINS` с HTTPS-доменом, `JWT_SECRET` (не короче 32 символов), `SMTP_HOST` (в compose это `mailpit`), `SMTP_PORT=1025`, `APP_WEB_URL` с HTTPS-доменом. Для Web Push добавьте `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (сгенерировать: `pnpm vapid:generate`) и `VAPID_SUBJECT`. API и S3 наружу не публикуются.
-   В production API не стартует без `JWT_SECRET`, `SMTP_HOST`, `DATABASE_URL`, `CORS_ORIGINS`, `APP_WEB_URL` и при `REQUIRE_EMAIL_VERIFICATION=false`. Перед первым деплоем Сессии 3 добавьте `JWT_SECRET` в `/opt/staynest/.env`: `openssl rand -base64 48`.
+1. Код на сервере: `git pull --ff-only` в `/opt/staynest` (или `DEPLOY_REF=v1.2.3 ./scripts/deploy.sh` для тега).
+2. `.env` лежит рядом с репозиторием (права `600`, владелец `deploy`): `NODE_ENV=production`, `TRUST_PROXY=true`, `DOMAIN`, `DATABASE_URL` с хостом `postgres`, `CORS_ORIGINS` с HTTPS-доменом, `JWT_SECRET` (не короче 32 символов, генерируется `openssl rand -base64 48`), `SMTP_HOST` (в compose это `mailpit`), `SMTP_PORT=1025`, `APP_WEB_URL` с HTTPS-доменом. Для Web Push добавьте `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (сгенерировать: `pnpm vapid:generate`) и `VAPID_SUBJECT`. API и S3 наружу не публикуются.
+   В production API не стартует без `JWT_SECRET`, `SMTP_HOST`, `DATABASE_URL`, `CORS_ORIGINS`, `APP_WEB_URL` и при `REQUIRE_EMAIL_VERIFICATION=false`. На стенде `REQUIRE_EMAIL_VERIFICATION=true`.
 3. Сборка образов, миграции **отдельной командой**, затем `docker compose up -d`.
 4. Проверка: `/health` отвечает `ok` с `db: up`, сайт по HTTPS, демо-сценарий.
-5. Бэкап-джоб и проверенное восстановление — в Сессии 17, до объявления деплоя полностью готовым.
+5. Бэкап-джоб и проверенное восстановление — раздел 11.
 
 Выкатка одной командой:
 
 ```bash
 ssh staynest
-sudo -u deploy -H bash -lc 'cd /opt/staynest && ./scripts/deploy.sh'
+cd /opt/staynest && ./scripts/deploy.sh
 ```
 
-Скрипт делает `git pull`, сборку, поднимает Postgres, применяет миграции (`node dist/migrate.js` внутри образа API) и перезапускает контур. Простой на время пересборки и миграции — секунды-десятки секунд; zero-downtime и откат по тегу остаются в Сессии 17.
+Скрипт делает `git pull` (или `git checkout --force` указанного `DEPLOY_REF`), сборку, поднимает Postgres, применяет миграции (`node dist/migrate.js` внутри образа API), перезапускает контур и ждёт `{"db":"up"}` от `/health`. Простой на время пересборки и миграции — секунды-десятки секунд; откат — повторный запуск с `DEPLOY_REF=<предыдущий тег>`.
 
 ## 8. Доступ агента к серверу и секреты
 
@@ -275,3 +280,141 @@ cd .. && sha256sum -c server-<timestamp>.tar.gz.sha256
 - Домен и доступ к DNS (A/AAAA-записи).
 - Что сейчас на сервере и что из этого нужно сохранить.
 - Согласованное окно простоя.
+
+## 11. Бэкапы и проверенное восстановление
+
+### 11.1. Что и куда бэкапится
+
+Ежедневно в **02:30 UTC** systemd-таймер `staynest-backup.timer` запускает
+`scripts/prod-backup.sh` от пользователя `deploy`:
+
+| Артефакт | Формат | Путь |
+|---|---|---|
+| База `staynest` | `pg_dump --format=custom -Z6` | `/home/deploy/backups/staynest/daily/staynest-<stamp>.dump` |
+| Роли и настройки | `pg_dumpall --globals-only` | рядом, `staynest-globals-<stamp>.sql` |
+| Бакет Silo | `tar.gz` тома `/data` | `staynest-silo-<stamp>.tar.gz` |
+| Контрольные суммы | SHA-256 | `*.sha256` |
+| Результат restore-check | счётчики строк | `*.restore-check.txt` |
+
+Скрипт сам делает `pg_restore --list`, восстанавливает дамп в отдельную базу
+`staynest_restore_check`, сравнивает количество `users`, `listings`, `bookings`
+с рабочей базой и только потом удаляет проверочную базу. Если счётчики
+разошлись, бэкап считается неудачным (exit 1).
+
+Ретенция: 7 дневных копий, по воскресеньям — ещё и недельная (хранится 4 недели).
+Каталог `700`, файлы `600`, владелец `deploy`.
+
+### 11.2. Ручной запуск и offsite-копия
+
+```bash
+ssh staynest
+cd /opt/staynest
+./scripts/prod-backup.sh          # запуск вручную, от deploy
+systemctl list-timers | grep staynest
+```
+
+Копия вне сервера забирается на машину разработчика:
+
+```powershell
+powershell -File scripts/pull-backups.ps1
+```
+
+После изменения юнитов в `infra/systemd/` их нужно установить заново (от пользователя с sudo):
+
+```bash
+sudo install -m 644 infra/systemd/staynest-*.service infra/systemd/staynest-*.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl restart staynest-backup.timer staynest-health.timer
+```
+
+Скрипт скачивает последний дамп, globals, бэкап бакета и SHA-256, проверяет
+контрольную сумму и кладёт всё в `C:\Users\User\staynest-backups\<stamp>`.
+Для регулярной offsite-копии можно указать `BACKUP_REMOTE` в
+`/etc/staynest/backup.env` и установить `rclone`; тогда скрипт сам скопирует
+архив в удалённое хранилище.
+
+### 11.3. Проверка 2026-10-20
+
+- Бэкап создан: `staynest-20261020T114242Z.dump` (116 КБ) и
+  `staynest-silo-20261020T114242Z.tar.gz` (7.0 МБ).
+- Restore-check: `users=9 listings=17 bookings=13` — совпало с рабочей базой.
+- Offsite-копия скачана на Windows, SHA-256 сошёлся.
+- Дамп из offsite-копии восстановлен на сервере в отдельную базу
+  `staynest_offsite_check`: `9 users, 17 listings, 13 bookings`. База удалена
+  после проверки.
+
+### 11.4. Восстановление вручную
+
+```bash
+ssh staynest
+cd /opt/staynest
+PG=$(docker compose --env-file .env -f infra/docker-compose.prod.yml ps -q postgres)
+U=$(grep '^POSTGRES_USER=' .env | cut -d= -f2-)
+docker cp /home/deploy/backups/staynest/daily/staynest-<stamp>.dump "$PG:/tmp/restore.dump"
+docker exec "$PG" createdb -U "$U" staynest_restore
+docker exec "$PG" pg_restore -U "$U" -d staynest_restore --no-owner --exit-on-error /tmp/restore.dump
+# проверить счётчики, затем при необходимости переключить DATABASE_URL на staynest_restore
+```
+
+Бакет восстанавливается распаковкой `staynest-silo-<stamp>.tar.gz` в том
+`staynest_silo-data` (контейнер Silo предварительно остановить).
+
+## 12. Мониторинг
+
+- `GET /api/v1/health` возвращает `{"status":"ok","db":"up"}`; Caddy и API
+  имеют Docker healthcheck, при падении контейнер перезапускается политикой
+  `unless-stopped`.
+- `staynest-health.timer` каждые 5 минут запускает `scripts/prod-healthcheck.sh`:
+  проверяет `/health`, наличие всех шести контейнеров, занятость диска (порог 85%)
+  и свежесть последнего бэкапа (порог 26 часов).
+- Ошибки пишутся в journal (`journalctl -u staynest-health.service`) и, если в
+  `/etc/staynest/health.env` задан `HEALTHCHECK_WEBHOOK_URL`, отправляются POST-ом
+  в webhook (Slack/Discord/свой обработчик).
+- Логи контейнеров ограничены `json-file` 10 МБ × 3 файла на сервис.
+- Просмотр: `docker compose --env-file .env -f infra/docker-compose.prod.yml logs -f api worker caddy`.
+
+## 13. CI/CD
+
+`.github/workflows/deploy.yml` выкатывает стенд:
+
+- по тегу `v*` (например, `git tag v0.17.0 && git push origin v0.17.0`);
+- вручную через **Actions → Deploy → Run workflow** (можно указать ветку или тег).
+
+Секреты репозитория: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`,
+`DEPLOY_SSH_KEY` (отдельный ключ `staynest-ci`, добавленный в
+`~deploy/.ssh/authorized_keys`), `DEPLOY_URL`. Workflow подключается по SSH,
+запускает `DEPLOY_REF=<ref> ./scripts/deploy.sh` и проверяет `/health`.
+Откат — запуск workflow с предыдущим тегом.
+
+`ci.yml` по-прежнему запускается на каждый push и PR: lint, types, tests,
+сборка, gitleaks, audit.
+
+## 14. Регистрация и демо-доступ на стенде
+
+На стенде `REQUIRE_EMAIL_VERIFICATION=true`: после регистрации письмо со
+ссылкой уходит в Mailpit, а вход до подтверждения возвращает
+`403 email_not_verified`. Это ожидаемое поведение, а не ошибка.
+
+Демо-аккаунты (созданы `pnpm seed:demo`, email уже подтверждён):
+
+| Роль | Email | Пароль |
+|---|---|---|
+| Хозяин | `host@staynest.demo` | `StayNest-Demo-2026` |
+| Гость | `guest@staynest.demo` | `StayNest-Demo-2026` |
+
+Письма Mailpit доступны только через SSH-туннель:
+
+```bash
+ssh -N -L 8025:127.0.0.1:8025 staynest
+# затем открыть http://localhost:8025
+```
+
+По SSH-туннелю также доступен Postgres для миграций и тестов:
+
+```bash
+ssh -N -L 5433:127.0.0.1:5433 staynest
+```
+
+Пароль `admin`/`admin` намеренно невозможен: политика требует минимум 10
+символов и проверяет пароль по списку утечек. Для тестирования используйте
+демо-аккаунты выше.
+
