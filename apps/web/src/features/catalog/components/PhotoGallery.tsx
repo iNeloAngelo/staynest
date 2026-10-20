@@ -33,6 +33,20 @@ function GalleryPhoto({
   sizes?: string;
 }) {
   const { t } = useTranslation();
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div
+        className={cn(
+          'flex size-full items-center justify-center bg-surface-2 text-ink-muted',
+          className,
+        )}
+      >
+        <ImageOff className="size-8" aria-hidden="true" strokeWidth={1.5} />
+      </div>
+    );
+  }
 
   return (
     <img
@@ -44,6 +58,7 @@ function GalleryPhoto({
       height={photo.height}
       loading={index === 0 ? 'eager' : 'lazy'}
       decoding="async"
+      onError={() => setFailed(true)}
       className={cn('size-full object-cover', className)}
     />
   );

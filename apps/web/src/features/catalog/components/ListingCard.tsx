@@ -1,5 +1,6 @@
 import type { PublicListingSummary } from '@staynest/shared';
 import { House } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { useLocale } from '../../../shared/i18n';
@@ -8,7 +9,8 @@ import { FavoriteButton } from '../../favorites/components/FavoriteButton';
 
 function CardPhoto({ listing, eager }: { listing: PublicListingSummary; eager: boolean }) {
   const { t } = useTranslation();
-  const cover = listing.coverPhoto;
+  const [failed, setFailed] = useState(false);
+  const cover = failed ? null : listing.coverPhoto;
 
   return (
     <div className="relative aspect-[4/3] overflow-hidden bg-surface-2">
@@ -22,6 +24,7 @@ function CardPhoto({ listing, eager }: { listing: PublicListingSummary; eager: b
           height={cover.height}
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
+          onError={() => setFailed(true)}
           className="size-full object-cover transition-transform duration-panel group-hover:scale-[1.02] motion-reduce:transform-none"
         />
       ) : (
