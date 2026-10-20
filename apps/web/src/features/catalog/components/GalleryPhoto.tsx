@@ -26,6 +26,7 @@ export function GalleryPhoto({
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
+    setFailed(false);
     const image = imgRef.current;
     if (image?.complete && image.naturalWidth === 0) setFailed(true);
   }, [photo.urls.md]);

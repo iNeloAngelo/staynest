@@ -14,6 +14,7 @@ function CardPhoto({ listing, eager }: { listing: PublicListingSummary; eager: b
   const cover = failed ? null : listing.coverPhoto;
 
   useEffect(() => {
+    setFailed(false);
     const image = imgRef.current;
     // Кэшированный 404 может завершиться до подписки React на onError.
     if (image?.complete && image.naturalWidth === 0) setFailed(true);

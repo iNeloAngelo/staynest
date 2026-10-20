@@ -36,7 +36,7 @@ declare global {
   }
 }
 
-/** Telegram сам внедряет объект WebApp в страницу; внешний скрипт не нужен. */
+/** Официальный SDK Telegram создаёт объект WebApp; скрипт подключён в index.html. */
 export function getTelegramWebApp(): TelegramWebApp | null {
   if (typeof window === 'undefined') return null;
   return window.Telegram?.WebApp ?? null;
@@ -61,7 +61,7 @@ function attempt(action: () => void): void {
 /** Готовность, разворот на весь экран и цвета Telegram. */
 export function initTelegramUi(): void {
   const app = getTelegramWebApp();
-  if (!app) return;
+  if (!app?.initData) return;
 
   attempt(() => app.ready?.());
   attempt(() => app.expand?.());

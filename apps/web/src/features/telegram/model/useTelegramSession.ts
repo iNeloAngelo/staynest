@@ -33,10 +33,11 @@ export function useTelegramSession(): TelegramSessionState {
         if (cancelled) return;
 
         const previousOwner = getSessionOwner();
-        if (previousOwner !== null && previousOwner !== result.user.id) {
-          // Чужие кэши и push-подписка не должны перейти новому Telegram-аккаунту.
-          await endSessionLocally(queryClient, { detachPush: true });
-        }
+        // Как и обычный вход: кэши прежнего владельца не должны перейти новому.
+        // Если владелец неизвестен (localStorage очищен), тоже чистим — безопаснее.
+        await endSessionLocally(queryClient, {
+          detachPush: previousOwner !== null && previousOwner !== result.user.id,
+        });
 
         rememberSessionOwner(result.user.id);
         queryClient.setQueryData(queryKeys.me, result.user);

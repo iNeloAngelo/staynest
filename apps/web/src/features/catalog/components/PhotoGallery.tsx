@@ -188,6 +188,44 @@ function LightboxControls({
   );
 }
 
+function LightboxImage({
+  photo,
+  title,
+  index,
+}: {
+  photo: ListingPhotoDto;
+  title: string;
+  index: number;
+}) {
+  const { t } = useTranslation();
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [photo.urls.lg]);
+
+  if (failed) {
+    return (
+      <div className="flex h-64 items-center justify-center rounded-md bg-surface-2 text-ink-muted">
+        <ImageOff className="size-10" aria-hidden="true" strokeWidth={1.5} />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={photo.urls.lg}
+      srcSet={`${photo.urls.thumb} 400w, ${photo.urls.md} 1000w, ${photo.urls.lg} 2000w`}
+      sizes="100vw"
+      alt={t('listing.photoAlt', { title, index: index + 1 })}
+      width={photo.width}
+      height={photo.height}
+      onError={() => setFailed(true)}
+      className="max-h-[65dvh] w-full rounded-md object-contain"
+    />
+  );
+}
+
 function Lightbox({
   photos,
   title,
@@ -227,16 +265,7 @@ function Lightbox({
     <Modal open={open} onClose={onClose} title={t('listing.gallery')}>
       {photo ? (
         <div className="flex flex-col gap-3">
-          <img
-            src={photo.urls.lg}
-            srcSet={`${photo.urls.thumb} 400w, ${photo.urls.md} 1000w, ${photo.urls.lg} 2000w`}
-            sizes="100vw"
-            alt={t('listing.photoAlt', { title, index: index + 1 })}
-            width={photo.width}
-            height={photo.height}
-            className="max-h-[65dvh] w-full rounded-md object-contain"
-          />
-
+          <LightboxImage photo={photo} title={title} index={index} />
           {total > 1 ? (
             <LightboxControls
               index={index}

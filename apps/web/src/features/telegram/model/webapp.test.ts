@@ -39,6 +39,24 @@ describe('Telegram WebApp detection', () => {
     expect(impactOccurred).toHaveBeenCalledWith('medium');
   });
 
+  it('с загруженным SDK, но без initData остаётся обычным браузером', () => {
+    const impactOccurred = vi.fn();
+    const ready = vi.fn();
+    install({
+      initData: '',
+      ready,
+      HapticFeedback: { impactOccurred, notificationOccurred: vi.fn() },
+    });
+
+    expect(isTelegramWebApp()).toBe(false);
+
+    hapticImpact();
+    expect(impactOccurred).not.toHaveBeenCalled();
+
+    initTelegramUi();
+    expect(ready).not.toHaveBeenCalled();
+  });
+
   it('готовит UI и применяет тёмную тему Telegram', () => {
     const ready = vi.fn();
     const expand = vi.fn();
