@@ -1,0 +1,1 @@
+export { seoRoutes } from './routes';

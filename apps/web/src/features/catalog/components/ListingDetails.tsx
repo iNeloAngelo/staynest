@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ApiError } from '../../../shared/api';
 import { Button } from '../../../shared/ui/Button';
 import { EmptyState } from '../../../shared/ui/EmptyState';
+import { useSeo, truncateMeta } from '../../../shared/lib/seo';
 import { useListing } from '../api/hooks';
 import { FavoriteButton } from '../../favorites/components/FavoriteButton';
 import { BookingAside, MobileBooking } from './BookingWidgets';
@@ -74,6 +75,16 @@ function ListingContent({ listing }: { listing: PublicListing }) {
 export function ListingDetails({ id }: { id: string }) {
   const { t } = useTranslation();
   const { data, isPending, isError, error, refetch } = useListing(id);
+
+  useSeo({
+    title: data ? `${data.title} · ${data.city}` : t('seo.listing.title'),
+    description: data
+      ? truncateMeta(`${data.city}. ${data.description}`)
+      : t('seo.listing.description'),
+    image: data?.coverPhoto?.urls.lg ?? '/og-image.jpg',
+    type: 'article',
+    noindex: isError,
+  });
 
   if (isPending) return <DetailsSkeleton />;
 

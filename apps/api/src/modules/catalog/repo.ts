@@ -355,3 +355,17 @@ export async function suggestCities(
 
   return rows.map((row) => row.city).filter((city): city is string => Boolean(city));
 }
+
+/** Для sitemap.xml: только опубликованные id, свежие первыми. */
+export async function listPublishedIds(
+  executor: DbExecutor,
+): Promise<{ id: string; published_at: Date | null }[]> {
+  return executor
+    .selectFrom('listings')
+    .select(['id', 'published_at'])
+    .where('status', '=', 'published')
+    .orderBy('published_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(50_000)
+    .execute();
+}

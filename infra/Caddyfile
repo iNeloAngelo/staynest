@@ -18,8 +18,26 @@
 
 	# SW, его runtime-файлы, manifest и index.html должны перепроверяться:
 	# иначе браузер продолжит запускать старую оболочку и не увидит обновление.
-	@navigation not path /assets/* /media/* /api/*
+	@navigation not path /assets/* /media/* /api/* /sitemap.xml /robots.txt
 	header @navigation Cache-Control "no-cache"
+
+	# Поисковые роботы и превью мессенджеров получают HTML с Open Graph из API.
+	@crawler {
+		path / /listings/*
+		header_regexp User-Agent "(?i)(bot|crawler|spider|facebookexternalhit|telegram|whatsapp|twitterbot|slackbot|discordbot|linkedinbot|vkshare)"
+	}
+
+	handle @crawler {
+		reverse_proxy api:3100
+	}
+
+	handle /sitemap.xml {
+		reverse_proxy api:3100
+	}
+
+	handle /robots.txt {
+		reverse_proxy api:3100
+	}
 
 	handle /media/listings/* {
 		@notAllowed not method GET HEAD

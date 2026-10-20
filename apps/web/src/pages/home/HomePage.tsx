@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { CatalogView } from '../../features/catalog/components/CatalogView';
 import { useMode } from '../../features/mode-switch';
+import { useSeo } from '../../shared/lib/seo';
 import { EmptyState, buttonClassName } from '../../shared/ui';
 
 function HostHome() {
@@ -38,6 +39,13 @@ function HostHome() {
 
 export function HomePage() {
   const { mode } = useMode();
+  const { t } = useTranslation();
+
+  useSeo({
+    title: t(mode === 'host' ? 'seo.hostHome.title' : 'seo.home.title'),
+    description: t(mode === 'host' ? 'seo.hostHome.description' : 'seo.home.description'),
+    image: '/og-image.jpg',
+  });
 
   return mode === 'host' ? <HostHome /> : <CatalogView />;
 }

@@ -141,6 +141,8 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/api': { target: 'http://localhost:3100', changeOrigin: false },
+        '/sitemap.xml': { target: 'http://localhost:3100', changeOrigin: false },
+        '/robots.txt': { target: 'http://localhost:3100', changeOrigin: false },
         // В dev Caddy нет: раздаём объекты Silo напрямую, как /media в проде.
         '/media': {
           target: s3Endpoint,
@@ -155,6 +157,8 @@ export default defineConfig(({ mode }) => {
       port: 4173,
       proxy: {
         '/api': { target: 'http://localhost:3100', changeOrigin: false },
+        '/sitemap.xml': { target: 'http://localhost:3100', changeOrigin: false },
+        '/robots.txt': { target: 'http://localhost:3100', changeOrigin: false },
         '/media': {
           target: s3Endpoint,
           changeOrigin: true,

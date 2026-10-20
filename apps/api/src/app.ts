@@ -20,6 +20,7 @@ import type { PushSender } from './modules/notifications/index';
 import { photosRoutes } from './modules/photos/index';
 import { pricingRoutes } from './modules/pricing/index';
 import { profileRoutes } from './modules/profile/index';
+import { seoRoutes } from './modules/seo/index';
 import type { AppConfig } from './platform/config/index';
 import type { Db } from './platform/db/index';
 import { createEventBus } from './platform/events/index';
@@ -87,6 +88,7 @@ async function registerModules({
   push,
 }: ModuleDeps) {
   await app.register(healthRoutes, { prefix: '/api/v1', db });
+  await app.register(seoRoutes, { db, config, storage });
   await app.register(authRoutes, {
     prefix: '/api/v1',
     config,

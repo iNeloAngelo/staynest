@@ -18,6 +18,7 @@ import {
   listAmenities,
   listPhotos,
   listPriceRules,
+  listPublishedIds,
   listPublishedListings,
   suggestCities,
 } from './repo';
@@ -212,6 +213,15 @@ export function createCatalogService({ db, storage }: CatalogServiceDependencies
 
     async cities(query: CitySuggestionsQuery): Promise<string[]> {
       return suggestCities(db.kysely, query.q, query.limit);
+    },
+
+    /** Публичные страницы для sitemap: только опубликованные объявления. */
+    async sitemapEntries(): Promise<{ id: string; publishedAt: string | null }[]> {
+      const rows = await listPublishedIds(db.kysely);
+      return rows.map((row) => ({
+        id: row.id,
+        publishedAt: row.published_at ? row.published_at.toISOString() : null,
+      }));
     },
   };
 }
