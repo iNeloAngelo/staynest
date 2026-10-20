@@ -141,6 +141,13 @@ test('хозяин публикует дом, гость бронирует, х�
 
   const hostPage = await browser.newPage();
   await uiLogin(hostPage, host.email);
+
+  await expect(hostPage.getByRole('button', { name: /непрочитанных/ })).toBeVisible();
+  await hostPage.getByRole('button', { name: /непрочитанных/ }).click();
+  const hostNotifications = hostPage.getByRole('dialog', { name: 'Уведомления' });
+  await expect(hostNotifications.getByText('Новая заявка')).toBeVisible();
+  await hostPage.keyboard.press('Escape');
+
   await hostPage.goto('/host/requests');
   await expect(hostPage.getByRole('heading', { name: 'Входящие заявки' })).toBeVisible();
   await expect(hostPage.getByText('Приедем к вечеру, нас двое.')).toBeVisible();
@@ -150,6 +157,14 @@ test('хозяин публикует дом, гость бронирует, х�
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Подтвердить' }).click();
   await expect(hostPage.getByText('Заявка подтверждена')).toBeVisible();
+
+  // SSE: гость видит новое уведомление и счётчик без перезагрузки страницы.
+  const guestBell = guestPage.getByRole('button', { name: /непрочитанных/ });
+  await expect(guestBell).toBeVisible();
+  await guestBell.click();
+  const guestNotifications = guestPage.getByRole('dialog', { name: 'Уведомления' });
+  await expect(guestNotifications.getByText('Бронь подтверждена')).toBeVisible();
+  await guestPage.keyboard.press('Escape');
 
   await guestPage.goto(bookingUrl);
   await expect(guestPage.getByText('Подтверждено').first()).toBeVisible();
