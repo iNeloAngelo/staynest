@@ -17,6 +17,21 @@
 
 ## Журнал
 
+> Записи ниже — журнал на дату. Если совет в старой записи противоречит
+> текущему коду или свежим документам, верны код и верхние записи; история не
+> переписывается, чтобы было видно, как менялось решение.
+
+### 2026-10-20 / Сессия 20 / упаковка кейса
+- **Зависший `vitest --coverage` держал advisory lock в тестовой базе.** Первый прогон покрытия убили по таймауту; его соединение осталось `idle` с `SELECT pg_advisory_lock($1)`, и следующий прогон 4 минуты ждал лок на одном файле. Симптом: vitest жив, CPU почти нулевой, в `pg_stat_activity` висит `idle` с advisory lock. Лечение: `select pg_terminate_backend(<pid>)` для зависшего backend (не для ожидающего!), затем повторить прогон. Перед интеграционными тестами полезно смотреть `pg_locks where locktype='advisory'`.
+- **Покрытие снимается без теста конкурентности.** 50×20 заявок с инструментацией v8 идут слишком долго; `--exclude "**/booking-concurrency.test.ts"` ускоряет отчёт, а сам тест остаётся в обычном `pnpm test`. В `docs/perf/coverage.md` это указано явно, чтобы цифры не выглядели как «всё покрыто».
+- **Gitleaks нашёл только тестовые пароли.** Пять находок — `StrongPass-2026`, `Mountain-River-2027` и e2e-`JWT_SECRET` из `playwright.config.ts`. Это не секреты, но без allowlist скан всегда красный и его перестают читать. Добавлен `.gitleaks.toml` с тремя путями (ADR-101); повторный скан истории: `no leaks found`.
+- **`ghcr.io` тянется в этом окружении бесконечно.** Образ `ghcr.io/zaproxy/zaproxy:stable` за 20 минут не скачался; `zaproxy/zap-stable` с Docker Hub поднялся. Для внешних инструментов в Docker сначала пробовать Docker Hub, а не ghcr.
+- **ffmpeg из Playwright не умеет H.264 и GIF.** Сборка `npx playwright install ffmpeg` минимальная: только png и libvpx-vp9. Для демо-видео используется `linuxserver/ffmpeg` в Docker; новых npm-зависимостей это не добавляет (ADR-099).
+- **`Out-File` в PowerShell добавляет BOM и ломает graphviz.** `dot` падал с `syntax error in line 1 near '﻿strict'`. Перед передачей файла внешнему инструменту сохранять UTF-8 без BOM (`UTF8Encoding($false)`) или писать файл через `write`.
+- **Документация успела разойтись с кодом.** `ARCHITECTURE.md` обещал OpenAPI `/api/docs`, которого нет; README предлагал `pnpm peers check` — такой команды в `package.json` не было. Перед упаковкой полезно проверять каждую команду и ссылку: `pnpm links:check` ловит битые пути, а команды — только ручной прогон.
+- **README без диаграмм читается хуже, чем кажется.** Mermaid в README (архитектура, ER, статусы) + один короткий GIF дают понимание за минуту; полный граф зависимостей на 1.8 МБ в README не вставлять — только ссылкой.
+
+
 ### 2026-10-20 / Сессия 19 / Telegram Mini App и починка стенда
 - **Сайт «упал» из-за fail-closed платежей, а не из-за Telegram.** На VPS оставался C17: деплой C18 не мог подняться, потому что `PAYMENT_WEBHOOK_SECRET` обязателен в production, а в `.env` его не было. Теперь `deploy.sh` при `PAYMENT_MOCK_ENABLED!=false` сам дописывает случайный секрет-заглушку. Урок: обязательное env-поле нужно не только валидировать, но и описать в деплой-скрипте/чек-листе, иначе первый же выкат роняет контур.
 - **Telegram WebApp — это SDK-скрипт, а не встроенный объект.** `window.Telegram.WebApp` создаёт официальный `telegram-web-app.js`: на мобильных он читает `TelegramWebviewProxy`, в Telegram Web — `#tgWebAppData` из hash. Без него `getTelegramWebApp()` всегда `null`, и весь Mini App молча остаётся гостем. Скрипт скачан в `apps/web/public/` и подключён локально, чтобы не ослаблять CSP `script-src 'self'`; SHA-256 зафиксирован в `docs/telegram.md`. Для iframe в Telegram Web достаточно `frame-ancestors`, но `X-Frame-Options: DENY` его перебивает — заголовок убран, allowlist оставлен только для `web.telegram.org`.

@@ -1,63 +1,56 @@
-# StayNest — пакет документов для OpenCode
+# Документация StayNest
 
-Рабочее название проекта: **StayNest** (платформа аренды домов: хозяин выставляет дом, гость бронирует через календарь).
-Название можно поменять, оно нигде не зашито в логику.
+Индекс документов. Читать в этом порядке, если нужен контекст проекта.
 
-## Что в пакете
+## Продукт и правила
 
 | Файл | Зачем |
 |---|---|
-| `AGENTS.md` | Правила работы агента. OpenCode читает его автоматически из корня репозитория |
-| `CONSTITUTION.md` | Непреложные принципы проекта. Агент не нарушает их ни при каких условиях |
-| `TZ.md` | Техническое задание: продукт, функции, правила, API, нефункциональные требования |
-| `DB.md` | Полная схема БД: таблицы, столбцы, типы, ограничения, индексы, готовый SQL |
-| `booking-engine.md` | Движок бронирования: транзакция, идемпотентность, статусы, pg-boss-джобы |
-| `DESIGN.md` | Дизайн-система: токены, типографика, компоненты, экраны, PWA-паттерны, чек-лист ревью |
-| `SESSIONS.md` | План сборки: 20 сессий, каждая заканчивается рабочим и проверенным результатом |
-| `TODO.md` | Чек-лист по сессиям. Агент отмечает выполненное |
-| `DECISIONS.md` | Журнал архитектурных решений (ADR). Агент дописывает новые |
-| `LEARNS.md` | Журнал граблей и находок. Агент дописывает после каждой сессии |
-| `credits.md` | Источники и лицензии демо-фотографий (StockSnap, CC0) |
-| `perf/*` | Отчёты по производительности, Lighthouse и планам запросов |
-| `ESTIMATE.md` | Оценка по времени и по деньгам |
-| `SKILLS-AND-AGENTS.md` | Что установить агенту (навыки, MCP, инструменты) и кто ревьюит какую сессию |
-| `skills/*/SKILL.md` | 9 навыков: протокол сессии, миграции, движок бронирования, PWA, дизайн PWA, дизайн-система, доступность, безопасность, тесты |
-| `agents/*.md` | 5 агентов-проверяющих: code, security, db, ui, qa |
+| [`../CONSTITUTION.md`](../CONSTITUTION.md) | Непреложные принципы: корректность брони, деньги, секреты, права |
+| [`../AGENTS.md`](../AGENTS.md) | Правила работы агента и протокол сессии |
+| [`TZ.md`](TZ.md) | Техническое задание: функции, API, нефункциональные требования |
+| [`SESSIONS.md`](SESSIONS.md) | План из 20 сессий и Definition of Done каждой |
+| [`DESIGN.md`](DESIGN.md) | Дизайн-система: токены, компоненты, состояния, чек-лист ревью |
+| [`ESTIMATE.md`](ESTIMATE.md) | Оценка по времени и деньгам |
 
-## Как разложить по репозиторию
+## Инженерия
 
-```
-staynest/
-├─ AGENTS.md
-├─ CONSTITUTION.md
-├─ docs/
-│  ├─ TZ.md  DB.md  DESIGN.md  SESSIONS.md  TODO.md  DECISIONS.md  LEARNS.md  ESTIMATE.md  SKILLS-AND-AGENTS.md
-├─ .opencode/skill/            <- сюда папки из skills/ (проверь актуальный путь в доке OpenCode:
-│  ├─ session-protocol/SKILL.md   в разных версиях это skill/ или skills/)
-│  ├─ db-migrations/  booking-engine/  pwa/  pwa-design/
-│  └─ design-system/  a11y/  security-checklist/  testing/
-├─ .opencode/agent/            <- сюда файлы из agents/ (проверь путь и формат в доке OpenCode)
-│  └─ code-reviewer.md  security-reviewer.md  db-reviewer.md  ui-reviewer.md  qa-tester.md
-├─ apps/api  apps/web  packages/shared
-├─ db/migrations
-├─ infra/
-└─ scripts/
-```
+| Файл | Зачем |
+|---|---|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Границы модулей, правила зависимостей, граф |
+| [`DB.md`](DB.md) | Схема БД, миграции, ER-диаграмма, ключевые запросы |
+| [`booking-engine.md`](booking-engine.md) | Транзакция брони, идемпотентность, статусы, pg-boss |
+| [`DECISIONS.md`](DECISIONS.md) | ADR: что выбрано и почему (101 решение) |
+| [`SECURITY.md`](SECURITY.md) | Модель угроз и защита по слоям |
+| [`security-report.md`](security-report.md) | Результаты ZAP baseline и чек-лист OWASP Top 10 |
+| [`ops.md`](ops.md) | Сервер, деплой, бэкапы, восстановление, инциденты |
+| [`payments.md`](payments.md) | Мок-провайдер и замена на ЮKassa/Stripe |
+| [`telegram.md`](telegram.md) | Telegram Mini App: вход, бот, ограничения |
 
-## Как запускать сессии
+## Отчёты
 
-1. Создай пустой репозиторий, положи туда файлы по схеме выше, сделай первый коммит.
-2. Открой OpenCode в корне репозитория.
-3. Для каждой сессии используй один и тот же стартовый промпт (меняется только номер):
+| Файл | Зачем |
+|---|---|
+| [`perf/search.md`](perf/search.md) | EXPLAIN, индексы и p50/p95 каталога на 10k/100k |
+| [`perf/concurrency.md`](perf/concurrency.md) | Тест 50 параллельных заявок на одни даты |
+| [`perf/lighthouse.md`](perf/lighthouse.md) | Lighthouse: локальная сборка и живой стенд |
+| [`perf/coverage.md`](perf/coverage.md) | Покрытие тестами API и web |
+| [`perf/catalog.md`](perf/catalog.md) | Замеры каталога до/после оптимизаций |
+| [`architecture/deps.svg`](architecture/deps.svg) | Полный граф зависимостей (dependency-cruiser) |
+| [`screens/`](screens/) | Скриншоты экранов 360/768/1280, светлая и тёмная тема |
 
-```
-Выполни Сессию N из docs/SESSIONS.md.
-Сначала прочитай по порядку: CONSTITUTION.md, AGENTS.md, docs/TZ.md, docs/DB.md,
-docs/DESIGN.md (если есть UI), docs/DECISIONS.md, docs/LEARNS.md, docs/TODO.md
-и навык session-protocol.
-Работай только в рамках Сессии N. Закончи по протоколу завершения из AGENTS.md, включая вызов ревьюверов
-по таблице из docs/SKILLS-AND-AGENTS.md.
-```
+## Кейс и материалы
 
-4. После сессии: запусти приложение, пройди чек-лист Definition of Done из SESSIONS.md руками. Только потом коммит в main и следующая сессия.
-5. Одна сессия = один отдельный чат OpenCode. Не тяни контекст через несколько сессий: вся память проекта живёт в `docs/`.
+| Файл | Зачем |
+|---|---|
+| [`case-study.md`](case-study.md) | Разбор кейса: задача, решения, сложности, результаты |
+| [`pitch.md`](pitch.md) | Тексты для резюме, Telegram, LinkedIn/hh |
+| [`demo.md`](demo.md) | Сценарий демо, запись видео, установка PWA |
+| [`credits.md`](credits.md) | Источники и лицензии демо-фотографий (CC0) |
+| [`LEARNS.md`](LEARNS.md) | Журнал граблей и найденных решений |
+| [`TODO.md`](TODO.md) | Чек-лист сессий и Backlog |
+| [`SKILLS-AND-AGENTS.md`](SKILLS-AND-AGENTS.md) | Навыки, MCP-серверы и таблица ревьюеров по сессиям |
+
+Конфигурация агентов и навыков (`.opencode/`) не хранится в репозитории:
+правила проекта — в `AGENTS.md` и `CONSTITUTION.md`, роли ревьюеров описаны в
+`SKILLS-AND-AGENTS.md`.

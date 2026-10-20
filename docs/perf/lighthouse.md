@@ -66,16 +66,50 @@ render delay из-за разбора стартового JS. Это ожида
    `load` + `requestIdleCallback`; precache 1.5 МБ не отбирает полосу у
    критических запросов.
 
+## Живой стенд (2026-10-20)
+
+Тот же Lighthouse 12.8.2, мобильный профиль, Edge headless, но цель —
+продакшен-стенд по HTTPS через Caddy (HTTP/2 + zstd/gzip). Один прогон:
+
+```powershell
+pnpm dlx lighthouse@12.8.2 "https://olivertwist95.clodocd.com/" `
+  --chrome-path="C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" `
+  --chrome-flags="--headless=new --no-sandbox" `
+  --output=json --output-path=tmp/reports/lighthouse-live.json --quiet
+```
+
+| Категория | Порог DoD | Живой стенд |
+|---|---:|---:|
+| Performance | ≥ 85 | **93** |
+| Accessibility | ≥ 95 | **100** |
+| Best Practices | ≥ 95 | **93** |
+| SEO | ≥ 90 | **100** |
+
+Метрики: FCP 2.2 с, LCP 2.9 с, TBT 80 мс, CLS 0, Speed Index 2.2 с.
+LCP-элемент — `h1` «Дом, который ждёт вас».
+
+Почему не 100:
+
+- **`errors-in-console`** — анонимный `GET /me` получает 401, затем refresh 403.
+  Это ожидаемый контракт сессии; ошибка видна только в консоли.
+- **`inspector-issues`** — предупреждения браузера по CSP/ресурсам.
+- **`unminified-javascript`** — официальный `telegram-web-app.js` лежит локально
+  как есть (минифицировать чужой SDK без нужды не будем).
+- **`render-blocking` / `image-delivery`** — стартовый CSS/JS и фото карточек;
+  дальше дробить vendor-чанки смысла мало (см. ниже).
+- **`unused-javascript`** — главная грузит код каталога и карточек; остальные
+  экраны уже ленивые.
+
 ## Замечания аудита, которые остались
 
 - `errors-in-console`: анонимный `GET /me` получает 401, затем refresh — 403.
   Это ожидаемый контракт; консольные ошибки не влияют на функциональность,
   но стоят 4 балла Best Practices.
-- `robots.txt` отсутствует — SEO 92. Запланировано в Сессии 16 (SEO-блок).
-- TBT 150–180 мс даёт разбор стартового чанка React + router + TanStack Query.
-  Дальнейшее дробление vendor-кода не дало выигрыша в замерах: три параллельных
-  запроса на HTTP/1.1 в локальном сервере нивелировали экономию. В проде
-  HTTP/2 и zstd должны быть немного лучше.
+- `robots.txt` и `sitemap.xml` появились в Сессии 16 и отдаются API через Caddy;
+  в локальном замере Сессии 15 их ещё не было.
+- TBT 150–180 мс в локальном замере даёт разбор стартового чанка React + router +
+  TanStack Query. На живом стенде с HTTP/2 и zstd TBT — 80 мс, так что дальше
+  дробить vendor-код не требуется.
 - Lighthouse не проверяет установку на реальном Android/iOS. Это ручной
   чек-лист DoD; PWA-поведение (SW, офлайн, очистка кэшей) автоматизировано
   в `pnpm e2e:pwa`.

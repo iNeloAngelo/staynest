@@ -1,116 +1,255 @@
 # StayNest
 
-PWA для аренды домов: хозяин создаёт объявление и управляет календарём, гость ищет свободные даты и отправляет заявку на бронирование. Один аккаунт, два режима — «Я ищу» и «Я сдаю».
+PWA для аренды домов: хозяин создаёт объявление и управляет календарём, гость
+ищет свободные даты и отправляет заявку на бронирование. Один аккаунт, два
+режима — «Я ищу» и «Я сдаю».
 
-Живой стенд: https://olivertwist95.clodocd.com
+**Живой стенд:** https://olivertwist95.clodocd.com · **Код:** https://github.com/iNeloAngelo/staynest · **Разбор кейса:** [docs/case-study.md](docs/case-study.md)
 
-Проект собирается по сессиям: план и правила лежат в `docs/SESSIONS.md` и `AGENTS.md`.
+[![Тур по StayNest](docs/media/tour.gif)](https://olivertwist95.clodocd.com)
 
-## Стек
+## Что это
+
+Портфолио-кейс, собранный по сессиям: план, правила и Definition of Done лежат
+в [docs/SESSIONS.md](docs/SESSIONS.md) и [AGENTS.md](AGENTS.md). Главная
+инженерная идея — **двойное бронирование невозможно на уровне PostgreSQL**, а
+не только в коде приложения.
+
+| Гость | Хозяин |
+|---|---|
+| Каталог с фильтрами и поиском по свободным датам | Мастер создания объявления (5 шагов, автосохранение) |
+| Календарь с занятыми ночами и ценой за период | Цены: выходные и сезонные правила |
+| Заявка с сообщением, «Мои поездки», отмена | «Входящие заявки»: подтвердить/отклонить |
+| Избранное, уведомления, Web Push | Календарь занятости, сводка и доход |
+| PWA: установка, офлайн-чтение, тёмная тема | Депозит после подтверждения (мок-оплата) |
+
+Скриншоты: [docs/screens](docs/screens) (360 / 768 / 1280, светлая и тёмная
+тема).
+
+## Архитектура
+
+```mermaid
+flowchart LR
+  subgraph Client["Браузер / PWA"]
+    SPA["React SPA<br/>TanStack Query · Workbox"]
+  end
+  subgraph Edge["Caddy (HTTPS)"]
+    direction TB
+    STATIC["Статика и /media"]
+    PROXY["/api/v1 → API<br/>SSE без буферизации"]
+  end
+  subgraph Server["Docker Compose на VPS"]
+    API["Fastify API<br/>15 модулей"]
+    WORKER["Worker<br/>pg-boss: истечение,<br/>завершение, депозиты"]
+  end
+  PG[("PostgreSQL 16<br/>btree_gist · citext · pg_trgm")]
+  S3[("Silo (S3)<br/>фото и аватары")]
+  MAIL["Mailpit / SMTP"]
+
+  SPA --> STATIC
+  SPA --> PROXY --> API
+  SPA -. "SSE /me/events" .-> API
+  API --> PG
+  WORKER --> PG
+  API --> S3
+  API --> MAIL
+  WORKER -. "push через web-push" .-> SPA
+```
+
+- **Модульный монолит.** 15 модулей API (`apps/api/src/modules`) и 14 фич web
+  (`apps/web/src/features`). Границы проверяет dependency-cruiser: импорт
+  внутренностей чужого модуля ломает CI. Карта блоков —
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), полный граф —
+  [docs/architecture/deps.svg](docs/architecture/deps.svg).
+- **Один аккаунт, два режима.** Роль определяется действием, а не типом
+  аккаунта; права проверяются на сервере на каждом эндпоинте.
+- **Фоновые задачи** (истечение заявки, завершение брони, просрочка депозита)
+  живут в отдельном процессе worker, чтобы API не блокировался.
+
+### Схема данных
+
+Полная ER-схема и описание таблиц — [docs/DB.md](docs/DB.md). Ядро:
+
+```mermaid
+erDiagram
+  users ||--o{ listings : "owner_id"
+  users ||--o{ bookings : "guest_id"
+  listings ||--o{ bookings : has
+  bookings ||--o{ booking_events : logs
+  bookings ||--o{ payments : "депозит"
+  listings ||--o{ listing_photos : has
+  listings ||--o{ listing_price_rules : has
+  listings ||--o{ listing_blocks : has
+  users ||--o{ favorites : has
+  users ||--o{ notifications : receives
+  users ||--o{ push_subscriptions : has
+```
+
+### Статусы брони
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: гость отправил заявку
+  pending --> confirmed: хозяин подтвердил
+  pending --> declined: хозяин отклонил
+  pending --> expired: истёк TTL (24 ч)
+  pending --> cancelled_by_guest: гость отменил
+  confirmed --> cancelled_by_guest: до заезда
+  confirmed --> cancelled_by_host: хозяин с причиной
+  confirmed --> completed: прошла дата выезда
+  confirmed --> expired: депозит не оплачен в срок
+  declined --> [*]
+  expired --> [*]
+  completed --> [*]
+  cancelled_by_guest --> [*]
+  cancelled_by_host --> [*]
+```
+
+Движок, порядок блокировок, идемпотентность и коды ошибок —
+[docs/booking-engine.md](docs/booking-engine.md).
+
+## Технологии
 
 - **Монорепо:** pnpm workspaces, Node.js 24, TypeScript strict.
-- **API:** Fastify, zod, Kysely + pg, node-pg-migrate, pg-boss, pino.
-- **Web:** React, Vite, React Router, TanStack Query, Tailwind CSS, i18next.
-- **Инфраструктура:** PostgreSQL 16, S3-совместимое хранилище Silo (форк MinIO, см. ADR-021), Mailpit, Caddy, Docker Compose.
+- **API:** Fastify, zod, Kysely + pg, node-pg-migrate, pg-boss, argon2, sharp,
+  S3 SDK, web-push, pino.
+- **Web:** React 19, Vite, React Router, TanStack Query, Tailwind CSS,
+  react-hook-form + zod, react-day-picker, i18next (ru/en), vite-plugin-pwa.
+- **Инфраструктура:** PostgreSQL 16, Silo (S3, форк MinIO — ADR-021), Mailpit,
+  Caddy, Docker Compose на VPS.
 
-## Требования
-
-- Node.js 24+
-- pnpm 12 (`corepack enable` или `npm i -g pnpm`)
-- Docker Desktop (запущен) или Docker Engine с Compose — только для локальной инфраструктуры; при работе через VPS-туннель не требуется
+Решения и их причины — 101 ADR в [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Быстрый старт
 
-> В текущем окружении Postgres для разработки работает на VPS и доступен через SSH-туннель (ADR-027, `docs/ops.md` §2.1), поэтому `pnpm infra:up` не нужен. Локальный compose ниже — вариант для чистой машины.
+Требования: Node.js 24+, pnpm 12, Docker (для локальной инфраструктуры).
 
 ```bash
 cp .env.example .env        # Windows PowerShell: Copy-Item .env.example .env
 pnpm install
-pnpm infra:up               # Postgres, Silo (S3), Mailpit (нужен локальный Docker)
-pnpm db:reset               # ВНИМАНИЕ: удаляет схему и данные в DATABASE_URL
-pnpm seed:demo              # 14 домов, фото, брони и два демо-аккаунта
+pnpm infra:up               # Postgres, Silo (S3), Mailpit
+pnpm db:reset               # ВНИМАНИЕ: пересоздаёт схему в DATABASE_URL
+pnpm seed:demo              # 14 домов, фото, брони, два демо-аккаунта
 pnpm dev                    # API :3100 и web :5173
 ```
 
-> `pnpm db:reset` разрушительный: он пересоздаёт схему в базе из `DATABASE_URL`
-> и удаляет данные. На уже настроенной базе используйте `pnpm db:migrate`.
+> `pnpm db:reset` разрушительный: он пересоздаёт схему в базе из `DATABASE_URL`.
+> На настроенной базе используйте `pnpm db:migrate`.
 
-Демо-аккаунты после `pnpm seed:demo`:
-
-| Роль | Email | Пароль |
-|---|---|---|
-| Хозяин | `host@staynest.demo` | `StayNest-Demo-2026` |
-| Гость | `guest@staynest.demo` | `StayNest-Demo-2026` |
-
-На живом стенде включено подтверждение email: после регистрации письмо уходит в
-Mailpit, а вход до подтверждения возвращает `403 email_not_verified`. Письма
-смотрятся через SSH-туннель к серверу:
-
-```bash
-ssh -N -L 8025:127.0.0.1:8025 staynest
-# http://localhost:8025
-```
-
-Для быстрого тестирования используйте демо-аккаунты выше — их email уже
-подтверждён. Пароль вида `admin`/`admin` не подойдёт: минимум 10 символов и
-проверка по списку распространённых паролей.
-
-После подтверждения заявки гость оплачивает демо-депозит (20% от суммы) на
-отдельной странице мок-провайдера. Реальные деньги не списываются, карта не
-запрашивается; поток и замена мока на ЮKassa/Stripe описаны в
-`docs/payments.md`. В dev разрешены оба адреса — `http://localhost:5173` и
-`http://127.0.0.1:5173`; в production список origin строгий.
-
-Фото демо-домов взяты с StockSnap.io под CC0 1.0, источники перечислены в
-`docs/credits.md`. Сид идемпотентен: повторный запуск заменяет только
-демо-аккаунты (`host@staynest.demo`, `guest@staynest.demo`) и их данные.
-
-Проверка:
+В текущем окружении Postgres для разработки работает на VPS и доступен через
+SSH-туннель ([docs/ops.md](docs/ops.md), §2.1), поэтому `pnpm infra:up` можно
+пропустить.
 
 - Web: http://localhost:5173
 - API: http://localhost:3100/api/v1/health
 - Mailpit: http://localhost:8025
 - Консоль S3: http://localhost:9001
 
-Порты выбраны так, чтобы не конфликтовать с другими локальными проектами (3000 и 5432 часто заняты). Подробности — ADR-022.
+Порты выбраны так, чтобы не конфликтовать с другими проектами (ADR-022).
 
-## Команды
+## Демо-аккаунты
+
+| Роль | Email | Пароль |
+|---|---|---|
+| Хозяин | `host@staynest.demo` | `StayNest-Demo-2026` |
+| Гость | `guest@staynest.demo` | `StayNest-Demo-2026` |
+
+На стенде включено подтверждение email: у демо-аккаунтов оно уже пройдено, а
+новые письма уходят в Mailpit (доступ по SSH-туннелю, `docs/ops.md`).
+Сид идемпотентен: повторный `pnpm seed:demo` заменяет только демо-аккаунты и
+их данные. Фото — StockSnap.io под CC0, источники в
+[docs/credits.md](docs/credits.md).
+
+> **Стенд демонстрационный.** Не вводите настоящие персональные данные и
+> реальные платёжные реквизиты: база пересоздаётся, письма уходят в тестовый
+> Mailpit, оплата — мок. Демо-аккаунты общие, поэтому не храните в них ничего
+> личного.
+
+## Проверки и отчёты
 
 | Команда | Что делает |
 |---|---|
-| `pnpm dev` | API и web в режиме разработки |
+| `pnpm lint` | ESLint: TypeScript strict-правила, React, jsx-a11y, лимиты размера |
+| `pnpm typecheck` | TypeScript strict без emit |
+| `pnpm test` | Vitest: 605 тестов в API, web и shared |
+| `pnpm e2e` | Playwright: бронирование от публикации до подтверждения |
+| `pnpm e2e:pwa` | PWA на production-сборке: SW, офлайн, очистка кэшей |
+| `pnpm depcheck` | dependency-cruiser: циклы и границы модулей |
+| `pnpm knip` | мёртвый код и неиспользуемые зависимости |
 | `pnpm build` | Сборка API и web |
-| `pnpm lint` | ESLint |
-| `pnpm typecheck` | TypeScript без emit |
-| `pnpm test` | Vitest во всех пакетах |
-| `pnpm e2e` | Playwright e2e на dev-сервере (база готовится отдельно) |
-| `pnpm e2e:pwa` | PWA e2e на production-сборке: SW, офлайн-чтение, очистка кэшей |
-| `pnpm e2e:prepare` | Пересоздать `E2E_DATABASE_URL` (`_test`, loopback) и накатить миграции |
-| `pnpm seed:demo` | Демо-данные: 14 домов, 13 броней, фото, два аккаунта |
-| `pnpm seed:demo:clean` | Удалить демо-данные и их фото из S3 |
-| `pnpm seed:perf` | 10 000 объявлений и 100 000 броней для замеров |
-| `pnpm og:generate` | Пересобрать Open Graph-обложку из демо-фото |
-| `pnpm depcheck` | Границы модулей (dependency-cruiser) |
-| `pnpm knip` | Мёртвый код и неиспользуемые зависимости |
-| `pnpm format` | Prettier |
-| `pnpm infra:up` / `infra:down` | Инфраструктура для разработки |
-| `pnpm peers check` | Проверка совместимости peer-зависимостей |
+| `pnpm db:reset` / `db:migrate` | Пересоздать / докатить миграции |
+| `pnpm seed:demo` / `seed:perf` | Демо-данные / 10 000 домов и 100 000 броней |
+| `pnpm perf:search` / `perf:http` | EXPLAIN + p50/p95 SQL и HTTP |
 
-E2E не трогает базу без явной подготовки: `E2E_DATABASE_URL=postgres://staynest:staynest@127.0.0.1:5433/staynest_e2e_test pnpm e2e:prepare`, затем `pnpm e2e` или `pnpm e2e:pwa`. Playwright сам поднимает API и web; для PWA-теста web собирается в production и запускается через `vite preview` на 4173.
+Отчёты: [конкурентность](docs/perf/concurrency.md) ·
+[планы запросов](docs/perf/search.md) ·
+[Lighthouse](docs/perf/lighthouse.md) ·
+[покрытие тестами](docs/perf/coverage.md) ·
+[безопасность (ZAP + OWASP)](docs/security-report.md).
+
+E2E не трогает базу без подготовки:
+
+```bash
+E2E_DATABASE_URL=postgres://staynest:staynest@127.0.0.1:5433/staynest_e2e_test pnpm e2e:prepare
+pnpm e2e        # или pnpm e2e:pwa
+```
+
+Playwright сам поднимает API и web; для PWA-теста web собирается в production и
+запускается через `vite preview` на 4173.
 
 ## Структура
 
 ```
-apps/api        Fastify API, модульный монолит
-apps/web        React PWA
-packages/shared общие zod-схемы и типы
-infra           docker-compose для разработки и staging на VPS
-docs            ТЗ, схема БД, дизайн, решения, план
-scripts         серверные скрипты (аудит, бэкап, SSH)
+apps/api          Fastify API, модульный монолит
+apps/web          React PWA
+packages/shared   общие zod-схемы и типы
+db/migrations     миграции node-pg-migrate (11, каждая с up и down)
+e2e, e2e-pwa      Playwright: сценарий брони и PWA-офлайн
+infra             docker-compose для разработки и прода, Caddyfile
+docs              ТЗ, схема БД, дизайн, ADR, отчёты, скриншоты
+scripts           сиды, замеры, бэкапы, деплой, демо-тур
 ```
 
-Правила границ модулей и фронтенда — в `docs/ARCHITECTURE.md`. Ключевые архитектурные решения — в `docs/DECISIONS.md`. Сервер, очистка, бэкапы и деплой — в `docs/ops.md`.
+## Документация
+
+| Документ | О чём |
+|---|---|
+| [docs/case-study.md](docs/case-study.md) | Кейс: задача, решения, сложности, результаты |
+| [docs/TZ.md](docs/TZ.md) | Техническое задание и критерии готовности |
+| [docs/DB.md](docs/DB.md) | Схема БД, миграции, ключевые запросы |
+| [docs/DESIGN.md](docs/DESIGN.md) | Дизайн-токены, компоненты, состояния |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | ADR: что выбрано и почему |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Границы модулей и правила зависимостей |
+| [docs/booking-engine.md](docs/booking-engine.md) | Бронирование, идемпотентность, джобы |
+| [docs/SECURITY.md](docs/SECURITY.md) | Модель угроз и защита |
+| [docs/security-report.md](docs/security-report.md) | ZAP baseline и чек-лист OWASP Top 10 |
+| [docs/ops.md](docs/ops.md) | Сервер, деплой, бэкапы, восстановление |
+| [docs/payments.md](docs/payments.md) | Мок-платёж и замена на провайдера |
+| [docs/telegram.md](docs/telegram.md) | Telegram Mini App |
+| [docs/demo.md](docs/demo.md) | Сценарий демо, видео и установка PWA |
+| [docs/pitch.md](docs/pitch.md) | Тексты для резюме и профилей |
+| [docs/LEARNS.md](docs/LEARNS.md) | Журнал граблей и решений |
+| [docs/TODO.md](docs/TODO.md) | Чек-лист сессий и Backlog |
+
+## Установка на телефон
+
+Android: открыть стенд в Chrome → баннер «Установить приложение» (или меню ⋮ →
+«Установить приложение»). iPhone: только Safari → «Поделиться» → «На экран
+«Домой»». Подробная инструкция и проверка офлайна/пуша —
+[docs/demo.md](docs/demo.md), §4.
 
 ## Безопасность
 
-Секреты хранятся только в `.env` (в git не попадает) и на сервере. `.env.example` содержит лишь локальные значения по умолчанию. Подробности — `docs/SECURITY.md`.
+Секреты хранятся только в `.env` (в git не попадает) и на сервере;
+`.env.example` содержит лишь локальные значения. Пароли — argon2id, сессии —
+httpOnly cookie с ротацией refresh, права проверяются на сервере, IDOR
+закрыт матрицей тестов. История git проверена `gitleaks`, зависимости —
+`pnpm audit` в CI. Подробности — [docs/SECURITY.md](docs/SECURITY.md) и
+[docs/security-report.md](docs/security-report.md).
+
+## Ограничения
+
+Проект осознанно не делает всё: SSE-хаб живёт в памяти одного инстанса, Web
+Push на реальных iPhone/Android требует ручной проверки, платёж — мок, отзывы
+не реализованы. Полный список — [docs/TODO.md](docs/TODO.md), раздел Backlog,
+и раздел 8 в [docs/case-study.md](docs/case-study.md).
