@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { Client } from 'pg';
 import { randomUUID } from 'node:crypto';
 
@@ -56,6 +57,27 @@ async function uiLogin(page: Page, email: string): Promise<void> {
   await page.getByLabel('Пароль', { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: 'Войти' }).click();
   await expect(page.getByRole('link', { name: /Профиль/ })).toBeVisible();
+}
+
+async function expectNoA11yViolations(page: Page): Promise<void> {
+  await page.evaluate(() => document.fonts.ready);
+  // Страницы входят с animate-page; axe на полупрозрачном слое видит ложный contrast.
+  await page.waitForTimeout(350);
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+
+  expect(
+    violations.map((violation) => ({
+      id: violation.id,
+      help: violation.help,
+      nodes: violation.nodes.map((node) => ({
+        target: node.target,
+        html: node.html,
+        summary: node.failureSummary,
+      })),
+    })),
+  ).toEqual([]);
 }
 
 async function addPhotos(listingId: string): Promise<void> {
@@ -148,6 +170,22 @@ async function checkFavorites(page: Page, listingId: string): Promise<void> {
   await expect(page.getByRole('button', { name: 'Добавить в избранное' })).toBeVisible();
 }
 
+async function verifyGuestBooking(guestPage: Page, bookingUrl: string): Promise<void> {
+  // SSE: гость видит новое уведомление и счётчик без перезагрузки страницы.
+  const guestBell = guestPage.getByRole('button', { name: /непрочитанных/ });
+  await expect(guestBell).toBeVisible();
+  await guestBell.click();
+  const guestNotifications = guestPage.getByRole('dialog', { name: 'Уведомления' });
+  await expect(guestNotifications.getByText('Бронь подтверждена')).toBeVisible();
+  await guestPage.keyboard.press('Escape');
+
+  await guestPage.goto(bookingUrl);
+  await expect(guestPage.getByText('Подтверждено').first()).toBeVisible();
+  await expect(guestPage.getByRole('heading', { name: 'Контакты' })).toBeVisible();
+  await expect(guestPage.getByText('улица Лесная, 12')).toBeVisible();
+  await expectNoA11yViolations(guestPage);
+}
+
 test('хозяин публикует дом, гость бронирует, хозяин подтверждает, гость видит статус', async ({
   browser,
   request,
@@ -156,10 +194,24 @@ test('хозяин публикует дом, гость бронирует, х�
   const listingId = await createPublishedListing(request);
   const guest = await apiLogin(request, uniqueEmail('guest'), 'Гость');
 
-  const guestPage = await browser.newPage();
+  // SEO: sitemap и robots отдаёт API через Vite-прокси, карточка попадает в карту сайта.
+  const sitemap = await request.get('/sitemap.xml');
+  expect(sitemap.status()).toBe(200);
+  expect(await sitemap.text()).toContain(`/listings/${listingId}`);
+  const robots = await request.get('/robots.txt');
+  expect(await robots.text()).toContain('Sitemap:');
+
+  const guestContext = await browser.newContext();
+  const guestPage = await guestContext.newPage();
   await uiLogin(guestPage, guest.email);
   await guestPage.goto(`/listings/${listingId}`);
   await expect(guestPage.getByRole('heading', { name: 'Дом у озера для e2e' })).toBeVisible();
+  await expect(guestPage).toHaveTitle(/Дом у озера для e2e/);
+  await expect(guestPage.locator('meta[property="og:title"]')).toHaveAttribute(
+    'content',
+    /Дом у озера для e2e/,
+  );
+  await expectNoA11yViolations(guestPage);
 
   // Избранное: сердечко на карточке дома синхронизируется со страницей избранного.
   await checkFavorites(guestPage, listingId);
@@ -177,7 +229,8 @@ test('хозяин публикует дом, гость бронирует, х�
   await expect(guestPage.getByText('Ожидает ответа').first()).toBeVisible();
   const bookingUrl = guestPage.url();
 
-  const hostPage = await browser.newPage();
+  const hostContext = await browser.newContext();
+  const hostPage = await hostContext.newPage();
   await uiLogin(hostPage, host.email);
 
   await expect(hostPage.getByRole('button', { name: /непрочитанных/ })).toBeVisible();
@@ -190,6 +243,7 @@ test('хозяин публикует дом, гость бронирует, х�
   await expect(hostPage.getByRole('heading', { name: 'Сводка', level: 1 })).toBeVisible();
   await expect(hostPage.getByText('Заявок в ожидании')).toBeVisible();
   await expect(hostPage.getByText('Занятость 30 дней')).toBeVisible();
+  await expectNoA11yViolations(hostPage);
 
   await hostPage.goto('/host/requests');
   await expect(hostPage.getByRole('heading', { name: 'Входящие заявки' })).toBeVisible();
@@ -201,16 +255,5 @@ test('хозяин публикует дом, гость бронирует, х�
   await dialog.getByRole('button', { name: 'Подтвердить' }).click();
   await expect(hostPage.getByText('Заявка подтверждена')).toBeVisible();
 
-  // SSE: гость видит новое уведомление и счётчик без перезагрузки страницы.
-  const guestBell = guestPage.getByRole('button', { name: /непрочитанных/ });
-  await expect(guestBell).toBeVisible();
-  await guestBell.click();
-  const guestNotifications = guestPage.getByRole('dialog', { name: 'Уведомления' });
-  await expect(guestNotifications.getByText('Бронь подтверждена')).toBeVisible();
-  await guestPage.keyboard.press('Escape');
-
-  await guestPage.goto(bookingUrl);
-  await expect(guestPage.getByText('Подтверждено').first()).toBeVisible();
-  await expect(guestPage.getByRole('heading', { name: 'Контакты' })).toBeVisible();
-  await expect(guestPage.getByText('улица Лесная, 12')).toBeVisible();
+  await verifyGuestBooking(guestPage, bookingUrl);
 });
