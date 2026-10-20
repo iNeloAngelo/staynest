@@ -94,7 +94,7 @@ function convert(videoPath) {
     '-i',
     rel,
     '-vf',
-    'trim=0:32,setpts=0.5*(PTS-STARTPTS),fps=10,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer',
+    'trim=0:32,setpts=0.5*(PTS-STARTPTS),fps=8,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer',
     '-loop',
     '0',
     'docs/media/tour.gif',

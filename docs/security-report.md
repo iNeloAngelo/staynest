@@ -67,7 +67,7 @@ origin, поэтому поведение не меняется.
 
 - **Cache-control.** `index.html` и `manifest` — `no-cache` (иначе PWA не увидит
   обновление), `robots.txt`/`sitemap.xml` — `public, max-age=600`. Это
-  намеренно; персональные ответы `/me/*` отдают `private, no-store` (см. §2.5).
+  намеренно; персональные ответы `/me/*` отдают `private, no-store`.
 - **Комментарии в бандле.** Ложное срабатывание: ZAP ищет слово `query` в
   минифицированном коде (`useOnline-*.js`) и в официальном
   `telegram-web-app.js`. Секретов и путей сервера там нет.
@@ -96,14 +96,14 @@ origin, поэтому поведение не меняется.
 ```bash
 docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
   detect --source=/repo --config=/repo/.gitleaks.toml
-# 100 коммитов, ~3.4 МБ → no leaks found
+# 107 коммитов, ~5.4 МБ → no leaks found (на момент скана)
 ```
 
 До добавления allowlist было 5 находок, все — синтетические значения в тестах:
 `StrongPass-2026` (`packages/shared/src/auth.test.ts`), `Mountain-River-2027`
 (`apps/api/src/modules/auth/routes.test.ts`), e2e-`JWT_SECRET`
 (`playwright.config.ts`). Эти значения не используются ни в одном окружении;
-пути разрешены точечно в `.gitleaks.toml` (ADR-101). `.env` в историю не
+в `.gitleaks.toml` разрешены ровно они (ADR-101). `.env` в историю не
 попадал: файл в `.gitignore` с первого коммита.
 
 ## 5. Что осталось

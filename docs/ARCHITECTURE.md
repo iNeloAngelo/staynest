@@ -159,9 +159,8 @@ apps/web/src/
 Актуальный граф строит dependency-cruiser, он же проверяет правила из §6:
 
 ```bash
-pnpm depcheck --output-type dot > tmp/deps.dot          # bash
-# PowerShell: Out-File добавляет BOM и dot падает, поэтому
-pnpm depcheck --output-type dot | Set-Content -Encoding utf8NoBOM tmp/deps.dot
+cmd /c "pnpm depcheck --output-type dot > tmp/deps.dot"
+# PowerShell: cmd пишет файл без BOM; Out-File добавляет BOM и dot падает.
 # SVG: нужен graphviz (dot). В репозитории уже лежит собранный граф:
 #   docs/architecture/deps.svg
 ```
