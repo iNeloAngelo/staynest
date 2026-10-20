@@ -45,20 +45,11 @@
 		reverse_proxy api:3100
 	}
 
-	handle_path /media/listings/* {
+	# Раздача файлов из бакета. Публичный доступ ограничен политикой бакета
+	# (listings/*/*/*.webp и avatars/*/*.webp); остальные ключи Silo отклонит.
+	handle_path /media/* {
 		@notAllowed not method GET HEAD
 		respond @notAllowed 405
-		# Бакет публичный только на listings/* (политику ставит API).
-		rewrite * /{$S3_BUCKET:staynest-media}{path}
-		reverse_proxy silo:9000
-		header Cache-Control "public, max-age=31536000, immutable"
-		header X-Content-Type-Options "nosniff"
-	}
-
-	handle_path /media/avatars/* {
-		@notAllowed not method GET HEAD
-		respond @notAllowed 405
-		# Публичная раздача только квадратных WebP-аватаров (политику ставит API).
 		rewrite * /{$S3_BUCKET:staynest-media}{path}
 		reverse_proxy silo:9000
 		header Cache-Control "public, max-age=31536000, immutable"
