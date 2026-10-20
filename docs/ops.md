@@ -400,11 +400,11 @@ sudo systemctl restart staynest-backup.timer staynest-health.timer
 - Бэкап создан: `staynest-20261020T114242Z.dump` (116 КБ) и
   `staynest-silo-20261020T114242Z.tar.gz` (7.0 МБ); после включения age
   артефакты шифруются в `.dump.age` / `.tar.gz.age`.
-- Restore-check: `users=9 listings=17 bookings=13` — совпало с рабочей базой.
+- Restore-check: `users=10 listings=17 bookings=13` — совпало с рабочей базой (10-й пользователь — тестовая регистрация С17).
 - Offsite-копия скачана на Windows, SHA-256 дампа и бакета сошлись.
-- Дамп из offsite-копии восстановлен на сервере в отдельную базу
-  `staynest_offsite_check`: `9 users, 17 listings, 13 bookings`. База удалена
-  после проверки.
+- Зашифрованный дамп из offsite-копии расшифрован локальным age-ключом и восстановлен
+  на сервере в отдельную базу `staynest_offsite_check`: `10 users, 17 listings,
+  13 bookings`. База удалена после проверки.
 
 ### 11.4. Восстановление вручную
 
