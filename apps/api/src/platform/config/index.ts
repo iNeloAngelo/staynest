@@ -4,6 +4,11 @@ import { loadEnvFile } from 'node:process';
 import { z } from 'zod';
 import { paymentsConfig } from './payments';
 import type { PaymentsConfig } from './payments';
+import { pushConfig, pushEnvSchema } from './push';
+import type { PushConfig } from './push';
+export type { PushConfig } from './push';
+import { assertTelegramProductionConfig, telegramConfig, telegramEnvSchema } from './telegram';
+import type { TelegramConfig } from './telegram';
 
 const logLevelSchema = z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
 
@@ -89,14 +94,14 @@ const envSchema = z.object({
     z.string().min(32).optional(),
   ),
 
-  /** Web Push: VAPID-пара генерируется `pnpm vapid:generate` и живёт только в .env. */
-  VAPID_PUBLIC_KEY: z.string().trim().optional(),
-  VAPID_PRIVATE_KEY: z.string().trim().optional(),
-  VAPID_SUBJECT: z
-    .string()
-    .trim()
-    .regex(/^(mailto:|https:\/\/)/, 'VAPID_SUBJECT: mailto: или https://')
-    .default('mailto:no-reply@staynest.local'),
+  /**
+   * Telegram Mini App: схема полей живёт в config/telegram.ts.
+   * Без TELEGRAM_BOT_TOKEN интеграция выключена целиком.
+   */
+  ...telegramEnvSchema.shape,
+
+  /** Web Push: ключи опциональны и описаны в config/push.ts. */
+  ...pushEnvSchema.shape,
 });
 
 type LogLevel = z.infer<typeof logLevelSchema>;
@@ -136,13 +141,6 @@ export type StorageConfig = {
   maxPixels: number;
 };
 
-export type PushConfig = {
-  enabled: boolean;
-  publicKey: string | null;
-  privateKey: string | null;
-  subject: string;
-};
-
 type BookingConfig = {
   /** Срок ответа хозяина на заявку. */
   requestTtlHours: number;
@@ -172,6 +170,7 @@ export type AppConfig = {
   storage: StorageConfig;
   booking: BookingConfig;
   payments: PaymentsConfig;
+  telegram: TelegramConfig;
   push: PushConfig;
 };
 
@@ -202,22 +201,6 @@ function bookingConfig(data: EnvData): BookingConfig {
       max: data.BOOKING_RATE_LIMIT_MAX,
       windowMs: data.BOOKING_RATE_LIMIT_WINDOW_MINUTES * 60_000,
     },
-  };
-}
-
-function pushConfig(data: EnvData): PushConfig {
-  const publicKey = data.VAPID_PUBLIC_KEY || null;
-  const privateKey = data.VAPID_PRIVATE_KEY || null;
-
-  if ((publicKey === null) !== (privateKey === null)) {
-    throw new Error('VAPID_PUBLIC_KEY и VAPID_PRIVATE_KEY задаются только вместе.');
-  }
-
-  return {
-    enabled: publicKey !== null && privateKey !== null,
-    publicKey,
-    privateKey,
-    subject: data.VAPID_SUBJECT,
   };
 }
 
@@ -272,6 +255,7 @@ function assertProductionConfig(env: NodeJS.ProcessEnv, data: EnvData): void {
     throw new Error('В production REQUIRE_EMAIL_VERIFICATION должен быть true.');
   }
   assertPaymentSecret(env, data);
+  assertTelegramProductionConfig(env, data);
   assertStorageSecret(env, data);
 }
 
@@ -341,6 +325,7 @@ function appConfigFrom(data: EnvData, env: NodeJS.ProcessEnv): AppConfig {
     },
     booking: bookingConfig(data),
     payments: paymentsConfig(data),
+    telegram: telegramConfig(data),
     push: pushConfig(data),
   };
 }

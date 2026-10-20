@@ -16,6 +16,7 @@ export default tseslint.config(
       '**/test-results/**',
       'tmp/**',
       'apps/api/tmp/**',
+      'apps/web/public/telegram-web-app.js',
       'apps/api/src/platform/db/schema.generated.ts',
     ],
   },

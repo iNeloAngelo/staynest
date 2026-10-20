@@ -6,7 +6,8 @@ export type UserRow = Selectable<Users>;
 
 export type CreateUserInput = {
   email: string;
-  passwordHash: string;
+  /** null — вход только через внешний провайдер (Telegram). */
+  passwordHash: string | null;
   displayName: string;
   locale: 'ru' | 'en';
   emailVerifiedAt?: Date;

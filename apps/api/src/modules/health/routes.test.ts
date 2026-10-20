@@ -47,6 +47,12 @@ const config: AppConfig = {
     depositTtlHours: 48,
     webhookSecret: 'test-payment-webhook-secret-with-32-chars',
   },
+  telegram: {
+    enabled: false,
+    botToken: null,
+    webhookSecret: null,
+    initDataMaxAgeSeconds: 3600,
+  },
   push: {
     enabled: false,
     publicKey: null,

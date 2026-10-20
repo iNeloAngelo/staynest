@@ -6,7 +6,16 @@ export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 
 export const localeSchema = z.enum(['ru', 'en']);
 
-export const emailSchema = z.string().trim().toLowerCase().email().max(254);
+const RESERVED_EMAIL_DOMAIN = '@telegram.invalid';
+
+export const emailSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email()
+  .max(254)
+  // Синтетические адреса Telegram-аккаунтов нельзя занять обычной регистрацией.
+  .refine((value) => !value.endsWith(RESERVED_EMAIL_DOMAIN), 'Этот домен зарезервирован.');
 
 export const passwordSchema = z.string().min(10).max(128);
 

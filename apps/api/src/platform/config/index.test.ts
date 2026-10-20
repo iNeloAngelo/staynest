@@ -112,6 +112,36 @@ describe('loadConfig', () => {
     });
   });
 
+  it('включает Telegram только при токене и требует webhook-секрет в production', () => {
+    const disabled = loadConfig({ ...baseEnv, NODE_ENV: 'test' });
+    expect(disabled.telegram).toMatchObject({
+      enabled: false,
+      botToken: null,
+      webhookSecret: null,
+    });
+
+    const enabled = loadConfig({
+      ...baseEnv,
+      NODE_ENV: 'test',
+      TELEGRAM_BOT_TOKEN: '123456:test-token',
+      TELEGRAM_WEBHOOK_SECRET: 'telegram-webhook-secret-24-chars',
+      TELEGRAM_INITDATA_MAX_AGE_SECONDS: '120',
+    });
+    expect(enabled.telegram).toMatchObject({
+      enabled: true,
+      botToken: '123456:test-token',
+      initDataMaxAgeSeconds: 120,
+    });
+
+    expect(() =>
+      loadConfig({
+        ...prodEnv,
+        TELEGRAM_BOT_TOKEN: '123456:test-token',
+        TELEGRAM_WEBHOOK_SECRET: '',
+      }),
+    ).toThrow(/TELEGRAM_WEBHOOK_SECRET/);
+  });
+
   it('нормализует завершающий слэш в CORS_ORIGINS', () => {
     const config = loadConfig({
       ...baseEnv,

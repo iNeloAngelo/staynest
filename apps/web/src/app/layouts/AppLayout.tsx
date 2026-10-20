@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation } from 'react-router-dom';
 import { ModeSwitchControl, useMode } from '../../features/mode-switch';
 import { InstallBanner, OfflineBanner, UpdateBanner } from '../../features/pwa';
+import { TelegramShell } from '../../features/telegram';
 import { BottomNav } from '../../shared/ui/BottomNav';
 import type { BottomNavItem } from '../../shared/ui/BottomNav';
 import { AppHeader } from './AppHeader';
@@ -60,6 +61,7 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      <TelegramShell />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:text-small focus:font-semibold focus:text-ink"

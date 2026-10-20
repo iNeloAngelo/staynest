@@ -17,10 +17,13 @@ import { healthRoutes } from './modules/health/index';
 import { listingsRoutes } from './modules/listings/index';
 import { notificationsRoutes } from './modules/notifications/index';
 import type { PushSender } from './modules/notifications/index';
+import type { TelegramSender } from './modules/telegram/index';
 import { photosRoutes } from './modules/photos/index';
 import { pricingRoutes } from './modules/pricing/index';
 import { profileRoutes } from './modules/profile/index';
 import { seoRoutes } from './modules/seo/index';
+import { telegramRoutes } from './modules/telegram/index';
+import type { TelegramBot } from './modules/telegram/index';
 import type { AppConfig } from './platform/config/index';
 import type { Db } from './platform/db/index';
 import { createEventBus } from './platform/events/index';
@@ -43,6 +46,8 @@ export type AppDependencies = {
   booking?: BookingOptions;
   storage?: MediaStorage;
   push?: PushSender;
+  telegramBot?: TelegramBot;
+  telegramSender?: TelegramSender;
 };
 
 const HELMET_OPTIONS = {
@@ -73,6 +78,8 @@ type ModuleDeps = {
   auth?: AuthOptions;
   booking?: BookingOptions;
   push?: PushSender;
+  telegramBot?: TelegramBot;
+  telegramSender?: TelegramSender;
 };
 
 async function registerModules({
@@ -86,6 +93,8 @@ async function registerModules({
   auth,
   booking,
   push,
+  telegramBot,
+  telegramSender,
 }: ModuleDeps) {
   await app.register(healthRoutes, { prefix: '/api/v1', db });
   await app.register(seoRoutes, { db, config, storage });
@@ -110,12 +119,20 @@ async function registerModules({
     logger,
     events,
     push,
+    ...(telegramSender ? { telegram: telegramSender } : {}),
   });
   await app.register(listingsRoutes, { prefix: '/api/v1', config, db, events, storage, logger });
   await app.register(photosRoutes, { prefix: '/api/v1', config, db, storage, logger });
   await app.register(favoritesRoutes, { prefix: '/api/v1', config, db, storage });
   await app.register(dashboardRoutes, { prefix: '/api/v1', config, db });
   await app.register(profileRoutes, { prefix: '/api/v1', config, db, storage, logger });
+  await app.register(telegramRoutes, {
+    prefix: '/api/v1',
+    config,
+    db,
+    logger,
+    ...(telegramBot ? { bot: telegramBot } : {}),
+  });
 }
 
 export async function buildApp({ config, logger, db, ...deps }: AppDependencies) {
@@ -171,6 +188,8 @@ export async function buildApp({ config, logger, db, ...deps }: AppDependencies)
     auth: deps.auth,
     booking: deps.booking,
     push: deps.push,
+    telegramBot: deps.telegramBot,
+    telegramSender: deps.telegramSender,
   });
 
   return app;

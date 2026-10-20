@@ -27,6 +27,8 @@ import {
 } from './errors';
 import { createPushSender, isAllowedPushHost } from './push';
 import type { PushSender } from './push';
+import { createTelegramBot, createTelegramSender } from '../telegram/index';
+import type { TelegramSender } from '../telegram/index';
 import {
   countUnread,
   deletePushSubscription,
@@ -44,6 +46,7 @@ export type NotificationServiceDependencies = {
   events: EventBus;
   hub?: NotificationHub;
   push?: PushSender;
+  telegram?: TelegramSender;
   now?: () => Date;
 };
 
@@ -136,6 +139,7 @@ export function createNotificationService({
   events,
   hub = createNotificationHub(),
   push = createPushSender(config.push, logger),
+  telegram = createTelegramSender(createTelegramBot(config.telegram, logger)),
   now = () => new Date(),
 }: NotificationServiceDependencies): NotificationService {
   const runtime: NotificationRuntime = {
@@ -145,6 +149,7 @@ export function createNotificationService({
     events,
     hub,
     push,
+    telegram,
     now,
     limiter: new FixedWindowRateLimiter(() => now().getTime()),
   };

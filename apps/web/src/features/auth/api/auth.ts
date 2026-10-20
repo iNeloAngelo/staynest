@@ -38,6 +38,14 @@ export function loginRequest(input: LoginInput): Promise<UserResponse> {
   return api.post<UserResponse>('/auth/login', input, { authRetry: false });
 }
 
+/**
+ * Обмен initData на cookie-сессию. Повторный вызов идемпотентен по telegram_id:
+ * аккаунт создаётся один раз, дальше выдаётся новая сессия.
+ */
+export function telegramAuthRequest(initData: string): Promise<UserResponse> {
+  return api.post<UserResponse>('/auth/telegram', { initData }, { authRetry: false });
+}
+
 export function registerRequest(input: RegisterInput): Promise<RegisterResponse> {
   return api.post<RegisterResponse>('/auth/register', input, { authRetry: false });
 }

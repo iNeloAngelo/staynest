@@ -81,6 +81,12 @@ function makeConfig(): AppConfig {
       depositTtlHours: 48,
       webhookSecret: 'test-payment-webhook-secret-with-32-chars',
     },
+    telegram: {
+      enabled: false,
+      botToken: null,
+      webhookSecret: null,
+      initDataMaxAgeSeconds: 3600,
+    },
     storage: {
       endpoint: 'http://localhost:9000',
       region: 'us-east-1',

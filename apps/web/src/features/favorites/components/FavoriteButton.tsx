@@ -2,6 +2,7 @@ import { Heart } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMe } from '../../auth';
+import { hapticImpact } from '../../telegram';
 import { cn } from '../../../shared/lib/cn';
 import { useOnline } from '../../../shared/lib/useOnline';
 import { useToast } from '../../../shared/ui';
@@ -28,6 +29,7 @@ export function FavoriteButton({ listingId, className }: FavoriteButtonProps) {
   const isFavorite = ids.includes(listingId);
 
   function onClick(): void {
+    hapticImpact();
     if (!online) {
       toast.show({ title: t('pwa.actionsOffline'), tone: 'error' });
       return;

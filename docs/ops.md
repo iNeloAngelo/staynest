@@ -29,7 +29,13 @@
 - 2026-10-20 (С17): Postgres доступен только на `127.0.0.1:5433`, Mailpit UI — на `127.0.0.1:8025`. Оба порта смотрятся через SSH-туннель, наружу не публикуются.
 - 2026-10-20 (С17): root-доступ по SSH закрыт (`PermitRootLogin no`), вход только пользователем `deploy` по ключу. `fail2ban`, UFW (22/80/443), `unattended-upgrades` активны. Внешняя проверка `check-host.net` подтвердила, что 5432/5433/8025/9000/3100 снаружи закрыты.
 - 2026-10-20 (С17): ежедневный бэкап БД и бакета настроен systemd-таймером, проверка восстановления и offsite-копия выполнены (раздел 11). Мониторинг `/health` — таймер каждые 5 минут (раздел 12).
-- 2026-10-20 (С17): CI/CD выкатывает тег `v*` или кнопку `workflow_dispatch` (раздел 13). Секреты `DEPLOY_*` добавлены в GitHub Actions.
+- 2026-10-20 (С17): CI/CD выкатывает тег `v*` или кнопку `workflow_dispatch` (раздел 13).
+- 2026-10-20 (С19): добавлена опциональная интеграция Telegram Mini App: вход по
+  HMAC-подписанному `initData`, вебхук бота и уведомления о бронях. Реального
+  токена бота на стенде нет, поэтому канал выключен; PWA и вход по email работают.
+  `deploy.sh` теперь сам генерирует заглушечный `PAYMENT_WEBHOOK_SECRET` для
+  мок-провайдера: без него API в production не стартовал (fail-closed).
+  CSP Caddy разрешает `frame-ancestors` только `web.telegram.org` и `*.telegram.org`. Секреты `DEPLOY_*` добавлены в GitHub Actions.
 
 ## 2. Целевая конфигурация
 
@@ -178,6 +184,10 @@ PAYMENT_MOCK_ENABLED=true
 PAYMENT_DEPOSIT_PERCENT=20
 PAYMENT_DEPOSIT_TTL_HOURS=48
 PAYMENT_WEBHOOK_SECRET=<openssl rand -base64 48>
+# Telegram Mini App: без токена канал выключен, PWA работает как обычно
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
+TELEGRAM_INITDATA_MAX_AGE_SECONDS=900
 SMTP_HOST=mailpit
 SMTP_PORT=1025
 S3_ENDPOINT=http://silo:9000
@@ -558,5 +568,12 @@ ssh -N -L 5433:127.0.0.1:5433 staynest
 `PAYMENT_MOCK_ENABLED=true`, в `.env` обязателен `PAYMENT_WEBHOOK_SECRET`
 (иначе API намеренно не стартует; секрет нужен в production всегда);
 `PAYMENT_MOCK_ENABLED=false` отключает депозит целиком и не регистрирует
-публичные маршруты мока. Подробности — `docs/payments.md`.
+публичные маршруты мока. Реальные ключи ЮKassa/Stripe не нужны: это заглушка.
+`deploy.sh` при отсутствии секрета генерирует случайную заглушку, чтобы мок
+не ронял прод. Подробности — `docs/payments.md`.
+
+Telegram Mini App на стенде выключен: `TELEGRAM_BOT_TOKEN` не задан, поэтому
+`/api/v1/auth/telegram` отвечает `503`, вебхук не зарегистрирован. Это не ошибка
+демо: основной канал — PWA. Как включить и что проверить с реальным ботом —
+`docs/telegram.md`.
 

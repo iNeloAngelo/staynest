@@ -11,3 +11,4 @@ export * from './payments';
 export * from './photos';
 export * from './pricing';
 export * from './stay-price';
+export * from './telegram';

@@ -32,6 +32,8 @@ export const ru = {
   'mode.guest': 'Я ищу',
   'mode.host': 'Я сдаю',
 
+  'telegram.openBooking': 'Забронировать',
+
   'header.home': 'StayNest — на главную',
   'header.login': 'Войти',
   'header.profile': 'Профиль',

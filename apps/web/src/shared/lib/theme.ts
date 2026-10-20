@@ -38,6 +38,15 @@ export function readThemePreference(): ThemePreference {
   return 'system';
 }
 
+/** Нужен Telegram Mini App: тему Telegram применяем только без ручного выбора. */
+export function hasStoredThemePreference(): boolean {
+  try {
+    return isPreference(window.localStorage.getItem(THEME_STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
 function updateThemeColor(theme: ResolvedTheme): void {
   let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
 

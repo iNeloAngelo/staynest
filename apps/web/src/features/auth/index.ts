@@ -5,6 +5,8 @@ export { RegisterForm } from './components/RegisterForm';
 export { SessionEndListener } from './components/SessionEndListener';
 export { TokenPasswordForm } from './components/TokenPasswordForm';
 export { useLogout, useMe, useResetPassword, useVerifyEmail } from './api/hooks';
+export { telegramAuthRequest } from './api/auth';
 export { endSessionLocally } from './model/end-session';
+export { getSessionOwner, rememberSessionOwner } from './model/session';
 export { authErrorKey } from './model/errors';
 export { safeNext } from './model/next';

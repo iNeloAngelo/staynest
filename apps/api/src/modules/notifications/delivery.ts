@@ -8,6 +8,8 @@ import type { EventBus } from '../../platform/events/index';
 import type { BookingEventPayload } from '../../platform/events/index';
 import type { FixedWindowRateLimiter } from '../../platform/http/rate-limit';
 import { usersService } from '../users/index';
+import { findTelegramChatId } from '../telegram/index';
+import type { TelegramSender } from '../telegram/index';
 import type { PushSender } from './push';
 import {
   deletePushSubscriptionById,
@@ -26,6 +28,16 @@ const PUSH_ENABLED_TYPES: ReadonlySet<NotificationType> = new Set([
   'booking_deposit_expired',
 ]);
 
+/** В Telegram не дублируем «поездка завершена» и истечение: это шум в чате. */
+const TELEGRAM_ENABLED_TYPES: ReadonlySet<NotificationType> = new Set([
+  'booking_requested',
+  'booking_confirmed',
+  'booking_declined',
+  'booking_cancelled',
+  'booking_expiring_soon',
+  'booking_deposit_expired',
+]);
+
 export type NotificationRuntime = {
   db: Db;
   config: AppConfig;
@@ -33,6 +45,7 @@ export type NotificationRuntime = {
   events: EventBus;
   hub: NotificationHub;
   push: PushSender;
+  telegram: TelegramSender;
   now: () => Date;
   limiter: FixedWindowRateLimiter;
 };
@@ -97,6 +110,31 @@ async function sendPush(
   }
 }
 
+async function sendTelegram(
+  runtime: NotificationRuntime,
+  input: {
+    userId: string;
+    locale: Locale;
+    type: NotificationType;
+    payload: NotificationPayload;
+  },
+): Promise<void> {
+  const { userId, locale, type, payload } = input;
+  if (!runtime.telegram.enabled || !TELEGRAM_ENABLED_TYPES.has(type)) return;
+
+  const chatId = await findTelegramChatId(runtime.db.kysely, userId);
+  if (!chatId) return;
+
+  const message = pushMessage(type, payload, locale, runtime.config.listingTimeZone);
+  const result = await runtime.telegram.send(chatId, {
+    title: message.title,
+    body: message.body,
+    url: `${runtime.config.webAppUrl}${message.url}`,
+  });
+
+  if (!result.ok) runtime.logger.warn({ code: result.code }, 'telegram notification failed');
+}
+
 async function createFor(
   runtime: NotificationRuntime,
   input: {
@@ -119,9 +157,16 @@ async function createFor(
   if (!row) return;
 
   runtime.hub.publish(userId, toNotificationDto(row));
+  const locale = user.locale === 'en' ? 'en' : 'ru';
   await sendPush(runtime, {
     userId,
-    locale: user.locale === 'en' ? 'en' : 'ru',
+    locale,
+    type,
+    payload,
+  });
+  await sendTelegram(runtime, {
+    userId,
+    locale,
     type,
     payload,
   });

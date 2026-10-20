@@ -20,6 +20,7 @@ export function BottomNav({ items, label, inline = false }: BottomNavProps) {
   return (
     <nav
       aria-label={label}
+      data-telegram-hide={inline ? undefined : 'true'}
       className={cn(
         'border-t border-border bg-surface',
         inline ? 'rounded-lg' : 'fixed inset-x-0 bottom-0 z-40 pb-safe lg:hidden',

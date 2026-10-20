@@ -48,63 +48,80 @@ function databaseName(urlValue: string): string {
   return decodeURIComponent(new URL(urlValue).pathname.replace(/^\//, ''));
 }
 
-export function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
-  const url = databaseUrl ?? '';
+const DEFAULT_AUTH: AppConfig['auth'] = {
+  jwtSecret: 'test-secret-with-at-least-32-characters',
+  accessTokenTtlSeconds: 900,
+  refreshTokenTtlDays: 30,
+  requireEmailVerification: true,
+  argon2: { memoryCost: 19_456, timeCost: 2, parallelism: 1 },
+};
 
+const DEFAULT_MAIL: AppConfig['mail'] = {
+  host: 'localhost',
+  port: 1025,
+  from: 'StayNest <no-reply@staynest.local>',
+};
+
+const DEFAULT_STORAGE: AppConfig['storage'] = {
+  endpoint: 'http://localhost:9000',
+  region: 'us-east-1',
+  bucket: 'staynest-media',
+  accessKey: 'test',
+  secretKey: 'test-secret',
+  publicPath: '/media',
+  maxUploadBytes: 10 * 1024 * 1024,
+  maxPerListing: 20,
+  maxPixels: 40_000_000,
+};
+
+const DEFAULT_BOOKING: AppConfig['booking'] = {
+  requestTtlHours: 24,
+  expiryWarningHours: 3,
+  maxActivePending: 5,
+  rateLimit: { max: 1_000, windowMs: 60_000 },
+};
+
+const DEFAULT_PAYMENTS: AppConfig['payments'] = {
+  mockEnabled: true,
+  depositPercent: 20,
+  depositTtlHours: 48,
+  webhookSecret: 'test-payment-webhook-secret-with-32-chars',
+};
+
+const DEFAULT_TELEGRAM: AppConfig['telegram'] = {
+  enabled: false,
+  botToken: null,
+  webhookSecret: null,
+  initDataMaxAgeSeconds: 3600,
+};
+
+const DEFAULT_PUSH: AppConfig['push'] = {
+  enabled: false,
+  publicKey: null,
+  privateKey: null,
+  subject: 'mailto:test@staynest.local',
+};
+
+export function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
     nodeEnv: 'test',
     host: '127.0.0.1',
     port: 0,
     logLevel: 'silent',
-    databaseUrl: url,
+    databaseUrl: databaseUrl ?? '',
     corsOrigins: ['http://localhost:5173'],
     trustProxy: false,
     dbQueryTimeoutMs: 5000,
     webAppUrl: 'http://localhost:5173',
     listingTimeZone: 'Europe/Moscow',
     ...overrides,
-    auth: {
-      jwtSecret: 'test-secret-with-at-least-32-characters',
-      accessTokenTtlSeconds: 900,
-      refreshTokenTtlDays: 30,
-      requireEmailVerification: true,
-      argon2: { memoryCost: 19_456, timeCost: 2, parallelism: 1 },
-      ...overrides.auth,
-    },
-    mail: overrides.mail ?? {
-      host: 'localhost',
-      port: 1025,
-      from: 'StayNest <no-reply@staynest.local>',
-    },
-    storage: overrides.storage ?? {
-      endpoint: 'http://localhost:9000',
-      region: 'us-east-1',
-      bucket: 'staynest-media',
-      accessKey: 'test',
-      secretKey: 'test-secret',
-      publicPath: '/media',
-      maxUploadBytes: 10 * 1024 * 1024,
-      maxPerListing: 20,
-      maxPixels: 40_000_000,
-    },
-    booking: overrides.booking ?? {
-      requestTtlHours: 24,
-      expiryWarningHours: 3,
-      maxActivePending: 5,
-      rateLimit: { max: 1_000, windowMs: 60_000 },
-    },
-    payments: overrides.payments ?? {
-      mockEnabled: true,
-      depositPercent: 20,
-      depositTtlHours: 48,
-      webhookSecret: 'test-payment-webhook-secret-with-32-chars',
-    },
-    push: overrides.push ?? {
-      enabled: false,
-      publicKey: null,
-      privateKey: null,
-      subject: 'mailto:test@staynest.local',
-    },
+    auth: { ...DEFAULT_AUTH, ...overrides.auth },
+    mail: overrides.mail ?? DEFAULT_MAIL,
+    storage: overrides.storage ?? DEFAULT_STORAGE,
+    booking: overrides.booking ?? DEFAULT_BOOKING,
+    payments: overrides.payments ?? DEFAULT_PAYMENTS,
+    telegram: overrides.telegram ?? DEFAULT_TELEGRAM,
+    push: overrides.push ?? DEFAULT_PUSH,
   };
 }
 

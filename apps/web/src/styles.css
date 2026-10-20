@@ -284,3 +284,11 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Telegram Mini App: на карточке дома нижнюю навигацию и мобильную панель цены
+ * заменяет MainButton. Флаг ставит TelegramShell, вне Telegram правило не работает.
+ */
+body[data-telegram-main='true'] [data-telegram-hide] {
+  display: none;
+}

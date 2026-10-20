@@ -34,6 +34,8 @@ export const en = {
   'mode.guest': 'I’m looking',
   'mode.host': 'I’m hosting',
 
+  'telegram.openBooking': 'Book now',
+
   'header.home': 'StayNest — go home',
   'header.login': 'Log in',
   'header.profile': 'Profile',

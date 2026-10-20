@@ -290,6 +290,16 @@
 ## ADR-094. Dev-origin: loopback на любом порту, production — только явный список
 **Принято.** Origin-guard получает `allowLoopback` при `NODE_ENV !== 'production'` и пропускает `http://localhost:<port>`, `http://127.0.0.1:<port>`, `http://[::1]:<port>`. Причина: Vite слушает `127.0.0.1`, может занять 5174/4173 при занятом порте, а `CORS_ORIGINS` в локальном `.env` может содержать только `localhost:5173` — вход падал с `403 origin_not_allowed`, хотя пароль верный. В production послабление выключено, `CORS_ORIGINS` остаётся строгим, а `assertProductionConfig` по-прежнему запрещает localhost. Вебхуки с HMAC исключены из origin-guard на любом окружении. Последствие: локальный `.env` больше не обязан перечислять каждый порт Vite; при этом production-запросы с чужого Origin по-прежнему отклоняются.
 
+## ADR-095. Telegram Mini App: вход по HMAC-подписанному initData, аккаунт по telegram_id
+**Принято.** `POST /auth/telegram` проверяет `initData` по алгоритму Telegram: `HMAC(HMAC("WebAppData", bot_token), data_check_string)`, сравнение через `timingSafeEqual`, свежесть `auth_date` (по умолчанию 1 час) и отсутствие дубликатов полей. Аккаунт создаётся автоматически по `telegram_id`, повторный вход переиспользует его. `users.email` остаётся NOT NULL UNIQUE: используется синтетический `tg<id>@telegram.invalid`, `password_hash = NULL`, `email_verified_at = now()`. Сессия — те же httpOnly cookie, что у email-входа; отдельный bearer-режим отложен (см. Backlog). Причина: не менять модель `users` и не плодить второй механизм сессий ради опционального канала. Последствие: в профиле виден синтетический email; для Telegram Web iframe возможны ограничения сторонних cookie.
+
+## ADR-096. CSP: frame-ancestors только для Telegram, X-Frame-Options убран
+**Принято.** `frame-ancestors` в Caddy расширен до `'self' https://web.telegram.org`, а `X-Frame-Options: DENY` удалён: он не поддерживает allowlist и перебивает CSP. Остальные директивы не ослаблены, внешние скрипты не разрешены. Официальный SDK `telegram-web-app.js` лежит локально в `apps/web/public/` (SHA-256 зафиксирован в `docs/telegram.md`) и подключается с `defer`: именно он создаёт `window.Telegram.WebApp` из `TelegramWebviewProxy` / `#tgWebAppData`. Последствие: сайт можно встроить только в свой контекст и Telegram; для любого другого родителя CSP по-прежнему запрещает фрейм.
+
+## ADR-097. Деплой-заглушка платёжного секрета для мок-провайдера
+**Принято.** `deploy.sh` при `PAYMENT_MOCK_ENABLED != false` и отсутствии `PAYMENT_WEBHOOK_SECRET` дописывает случайный секрет в `.env` (600) вместо падения API на старте. Реальный провайдер по-прежнему обязан задать секрет вручную и отключить мок. Причина: fail-closed проверка нужна, но её отсутствие на стенде уже один раз уронило выкат C18. Последствие: при пересоздании `.env` подпись старых мок-сессий станет недействительной — это безопасно, сессии короткоживущие.
+
+
 
 
 

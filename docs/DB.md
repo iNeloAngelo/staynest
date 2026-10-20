@@ -181,6 +181,11 @@ CREATE TABLE telegram_identities (
 );
 ```
 
+Аккаунт из Mini App создаётся автоматически: `users.email` обязателен, поэтому
+используется синтетический адрес `tg<telegram_id>@telegram.invalid`
+(домен `.invalid` зарезервирован), `password_hash = NULL`, `email_verified_at`
+заполняется сразу. Повторный вход идёт по `telegram_id` и не создаёт дубль.
+
 ## 4. amenities — справочник удобств
 
 | Столбец | Тип | Примечания |

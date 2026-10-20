@@ -20,6 +20,7 @@ import type { AuthContext } from '../../platform/http/auth-context';
 import { AppError } from '../../platform/http/errors';
 import { parseInput } from '../../platform/http/validate';
 import { createAuthGuard } from '../auth/index';
+import type { TelegramSender } from '../telegram/index';
 import { createNotificationHub } from './hub';
 import type { PushSender } from './push';
 import { createNotificationService } from './service';
@@ -33,6 +34,7 @@ type NotificationRoutesOptions = {
   logger: Logger;
   events: EventBus;
   push?: PushSender;
+  telegram?: TelegramSender;
 };
 
 type Guard = ReturnType<typeof createAuthGuard>;
@@ -196,6 +198,7 @@ export const notificationsRoutes: FastifyPluginAsync<NotificationRoutesOptions> 
     events: options.events,
     hub,
     ...(options.push ? { push: options.push } : {}),
+    ...(options.telegram ? { telegram: options.telegram } : {}),
   });
   const guard = createAuthGuard({ db: options.db, config: options.config });
 

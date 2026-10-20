@@ -14,6 +14,16 @@ describe('auth schemas', () => {
     expect(result.locale).toBe('ru');
   });
 
+  it('не даёт занять синтетический адрес Telegram', () => {
+    const result = registerInputSchema.safeParse({
+      email: 'tg123456789@telegram.invalid',
+      password: 'StrongPass-2026',
+      displayName: 'Маллори',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('отвергает короткий пароль', () => {
     const result = registerInputSchema.safeParse({
       email: 'user@example.ru',

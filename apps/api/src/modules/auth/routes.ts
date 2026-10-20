@@ -28,17 +28,12 @@ import type { Mailer } from '../../platform/mailer/index';
 import { parseInput } from '../../platform/http/validate';
 import { unauthorized } from './errors';
 import { createAuthGuard } from './guard';
+import { clearSessionCookies, setSessionCookies } from './cookies';
 import { createAuthService } from './service';
 import type { AuthService } from './service';
 import type { AuthOptions } from './service-context';
-import type { IssuedTokens, SessionMeta } from './session';
-import {
-  ACCESS_COOKIE,
-  REFRESH_COOKIE,
-  REFRESH_COOKIE_PATH,
-  accessCookieOptions,
-  refreshCookieOptions,
-} from './tokens';
+import type { SessionMeta } from './session';
+import { ACCESS_COOKIE, REFRESH_COOKIE } from './tokens';
 
 type AuthRoutesOptions = {
   config: AppConfig;
@@ -63,23 +58,6 @@ function metaOf(request: FastifyRequest): SessionMeta {
   };
 }
 
-function sessionCookies(reply: FastifyReply, tokens: IssuedTokens, config: AppConfig): void {
-  const secure = config.nodeEnv === 'production';
-  const refreshMaxAge = config.auth.refreshTokenTtlDays * 24 * 60 * 60;
-
-  reply.setCookie(
-    ACCESS_COOKIE,
-    tokens.accessToken,
-    accessCookieOptions(secure, config.auth.accessTokenTtlSeconds),
-  );
-  reply.setCookie(REFRESH_COOKIE, tokens.refreshToken, refreshCookieOptions(secure, refreshMaxAge));
-}
-
-function clearSessionCookies(reply: FastifyReply): void {
-  reply.clearCookie(ACCESS_COOKIE, { path: '/' });
-  reply.clearCookie(REFRESH_COOKIE, { path: REFRESH_COOKIE_PATH });
-}
-
 function authOf(request: FastifyRequest): AuthContext {
   if (!request.auth) throw unauthorized();
   return request.auth;
@@ -100,7 +78,7 @@ function registerPublicRoutes(app: FastifyInstance, service: AuthService, config
     noStore(reply);
     const input = parseInput<LoginInput>(loginInputSchema, request.body);
     const result = await service.login(input, metaOf(request));
-    sessionCookies(reply, result.tokens, config);
+    setSessionCookies(reply, result.tokens, config);
     return reply.send({ user: result.user });
   });
 
@@ -108,7 +86,7 @@ function registerPublicRoutes(app: FastifyInstance, service: AuthService, config
     noStore(reply);
     try {
       const result = await service.refresh(request.cookies[REFRESH_COOKIE], metaOf(request));
-      sessionCookies(reply, result.tokens, config);
+      setSessionCookies(reply, result.tokens, config);
       return reply.send({ user: result.user });
     } catch (error) {
       if (error instanceof AppError && error.status === 401) clearSessionCookies(reply);
