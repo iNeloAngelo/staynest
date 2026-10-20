@@ -130,7 +130,7 @@ export function BookingList({
   const { t } = useTranslation();
   const online = useOnline();
 
-  if (loading) return <ListSkeleton />;
+  if (loading) return online ? <ListSkeleton /> : <ListError onRetry={onRetry} online={false} />;
   if (error) return <ListError onRetry={onRetry} online={online} />;
   if (bookings.length === 0) {
     return (

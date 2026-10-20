@@ -1,4 +1,5 @@
 import { House } from 'lucide-react';
+import type { TFunction } from 'i18next';
 import type { ListingPhotoDto, ListingType } from '@staynest/shared';
 import { useTranslation } from 'react-i18next';
 import type { TranslationKey } from '../../../shared/i18n';
@@ -36,7 +37,7 @@ function Cover({ photos, title }: { photos: ListingPhotoDto[]; title: string }) 
   );
 }
 
-function capacityLine(t: ReturnType<typeof useTranslation>['t'], state: ListingFormState): string {
+function capacityLine(t: TFunction, state: ListingFormState): string {
   const parts: string[] = [];
   if (state.maxGuests.trim()) {
     parts.push(t('listings.wizard.preview.guests', { count: state.maxGuests }));

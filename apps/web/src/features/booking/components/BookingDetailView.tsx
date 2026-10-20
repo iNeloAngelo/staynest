@@ -1,9 +1,10 @@
-import { CalendarX, ShieldAlert } from 'lucide-react';
+import { CalendarX, ShieldAlert, WifiOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../../../shared/api';
 import { todayLocalIso } from '../../../shared/lib/dates';
+import { useOnline } from '../../../shared/lib/useOnline';
 import { useMe } from '../../auth';
 import { Button, EmptyState } from '../../../shared/ui';
 import { Skeleton } from '../../../shared/ui/Skeleton';
@@ -61,10 +62,32 @@ function DetailError({ notFound, onRetry }: { notFound: boolean; onRetry: () => 
   );
 }
 
+function DetailOffline() {
+  const { t } = useTranslation();
+
+  return (
+    <EmptyState
+      titleAs="h1"
+      icon={<WifiOff className="size-6" aria-hidden="true" />}
+      title={t('booking.detail.offlineTitle')}
+      description={t('booking.detail.offlineBody')}
+      action={
+        <Link
+          to="/trips"
+          className="inline-flex min-h-11 items-center text-small font-semibold text-primary hover:underline"
+        >
+          {t('booking.detail.backTrips')}
+        </Link>
+      }
+    />
+  );
+}
+
 export function BookingDetailView() {
   const { id } = useParams<{ id: string }>();
   const [params, setParams] = useSearchParams();
   const [created] = useState(() => params.get('created') === '1');
+  const online = useOnline();
   const { data: user } = useMe();
   const query = useBooking(id);
 
@@ -75,9 +98,10 @@ export function BookingDetailView() {
     setParams(next, { replace: true });
   }, [params, setParams]);
 
-  if (query.isPending) return <DetailSkeleton />;
+  if (query.isPending) return online ? <DetailSkeleton /> : <DetailOffline />;
 
   if (query.isError) {
+    if (!online) return <DetailOffline />;
     return (
       <DetailError
         notFound={query.error instanceof ApiError && query.error.status === 404}

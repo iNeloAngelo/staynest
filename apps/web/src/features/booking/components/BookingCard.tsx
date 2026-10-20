@@ -40,15 +40,14 @@ function PendingExpiry({
   const { t } = useTranslation();
   if (status !== 'pending' || !expiresAt) return null;
 
-  const hours = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 3_600_000);
+  const msLeft = new Date(expiresAt).getTime() - Date.now();
+  const hours = Math.ceil(msLeft / 3_600_000);
   if (!Number.isFinite(hours) || hours <= 0) return null;
 
+  const urgent = msLeft < 3 * 3_600_000;
+
   return (
-    <p
-      className={
-        hours < 3 ? 'text-small font-medium text-warning-ink' : 'text-small text-ink-muted'
-      }
-    >
+    <p className={urgent ? 'text-small font-medium text-warning-ink' : 'text-small text-ink-muted'}>
       {t('booking.card.expires', { count: hours })}
     </p>
   );

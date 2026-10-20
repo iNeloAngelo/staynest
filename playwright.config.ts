@@ -32,7 +32,7 @@ export default defineConfig({
         REQUIRE_EMAIL_VERIFICATION: 'false',
         APP_WEB_URL: baseURL,
         CORS_ORIGINS: `${baseURL},http://localhost:5173`,
-        JWT_SECRET: 'e2e-secret-with-at-least-32-characters-long',
+        JWT_SECRET: 'dev-only-e2e-secret-with-at-least-32-characters',
       },
     },
     {

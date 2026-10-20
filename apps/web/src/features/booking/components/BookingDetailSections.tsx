@@ -82,9 +82,12 @@ export function BookingHeading({
 
       {booking.status === 'pending' && booking.expiresAt ? (
         <p className="text-small font-medium text-warning-ink">
-          {t('booking.detail.replyDeadline', {
-            date: formatDateTime(booking.expiresAt, i18n.language),
-          })}
+          {t(
+            role === 'guest' ? 'booking.detail.replyDeadline' : 'booking.detail.replyDeadlineHost',
+            {
+              date: formatDateTime(booking.expiresAt, i18n.language),
+            },
+          )}
         </p>
       ) : null}
 
@@ -181,7 +184,13 @@ export function BookingContacts({
   return (
     <section className="rounded-lg border border-border bg-surface p-4">
       <h2 className="text-h3 text-ink">{t('booking.detail.contactsTitle')}</h2>
-      <p className="mt-1 mb-3 text-small text-ink-muted">{t('booking.detail.contactsBody')}</p>
+      <p className="mt-1 mb-3 text-small text-ink-muted">
+        {t(
+          booking.status === 'completed'
+            ? 'booking.detail.contactsBodyCompleted'
+            : 'booking.detail.contactsBody',
+        )}
+      </p>
       <dl className="flex flex-col gap-2">
         {booking.contacts.addressLine ? (
           <ContactRow label={t('booking.detail.address')} value={booking.contacts.addressLine} />

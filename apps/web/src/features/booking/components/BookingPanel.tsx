@@ -2,6 +2,7 @@ import { BOOKING_MESSAGE_MAX } from '@staynest/shared';
 import type { PublicListing } from '@staynest/shared';
 import { useTranslation } from 'react-i18next';
 import { formatLongDate } from '../../../shared/lib/dates';
+import { useOnline } from '../../../shared/lib/useOnline';
 import { Button } from '../../../shared/ui/Button';
 import { NumberStepper } from '../../../shared/ui/NumberStepper';
 import { Skeleton } from '../../../shared/ui/Skeleton';
@@ -50,13 +51,15 @@ function CalendarLegend() {
   );
 }
 
-function BookingError({ onRetry }: { onRetry: () => void }) {
+function BookingError({ onRetry, offline }: { onRetry: () => void; offline: boolean }) {
   const { t } = useTranslation();
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-small text-ink-muted">{t('booking.calendarError')}</p>
-      <Button variant="secondary" onClick={onRetry}>
+      <p className="text-small text-ink-muted">
+        {offline ? t('booking.calendarOffline') : t('booking.calendarError')}
+      </p>
+      <Button variant="secondary" onClick={onRetry} disabled={offline}>
         {t('common.retry')}
       </Button>
     </div>
@@ -274,6 +277,7 @@ export function BookingPanel({
   listing: PublicListing;
   heading?: boolean;
 }) {
+  const online = useOnline();
   const selection = useBookingSelection(listing);
   const { calendarQuery } = selection;
   const request = useBookingRequest({
@@ -289,6 +293,10 @@ export function BookingPanel({
   });
 
   if (calendarQuery.isPending) {
+    if (!online) {
+      return <BookingError offline onRetry={() => void calendarQuery.refetch()} />;
+    }
+
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
         <Skeleton className="h-6 w-1/2" />
@@ -299,7 +307,7 @@ export function BookingPanel({
   }
 
   if (calendarQuery.isError || !selection.calendar) {
-    return <BookingError onRetry={() => void calendarQuery.refetch()} />;
+    return <BookingError offline={!online} onRetry={() => void calendarQuery.refetch()} />;
   }
 
   return (
