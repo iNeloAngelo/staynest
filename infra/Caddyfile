@@ -1,3 +1,8 @@
+{
+	# Admin API нужен только для healthcheck внутри контейнера. Наружу порт не публикуется.
+	admin 127.0.0.1:2019
+}
+
 {$DOMAIN} {
 	# SSE нельзя сжимать: gzip/zstd буферизует кадры и ломает реальное время.
 	@notEvents not path /api/v1/me/events
@@ -10,6 +15,7 @@
 		X-Frame-Options "DENY"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; manifest-src 'self'; worker-src 'self'"
+		Cross-Origin-Opener-Policy "same-origin"
 		-Server
 	}
 

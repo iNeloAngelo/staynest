@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily StayNest backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+RandomizedDelaySec=10m
+Unit=staynest-backup.service
+
+[Install]
+WantedBy=timers.target

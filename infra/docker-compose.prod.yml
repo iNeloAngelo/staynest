@@ -1,7 +1,19 @@
 # Staging/prod-контур на VPS. Запуск из корня репозитория:
 #   docker compose --env-file .env -f infra/docker-compose.prod.yml up -d --build
 # Секреты и DOMAIN берутся из .env (права 600, в git не попадает).
+#
+# Сети разделены (Сессия 17):
+#   edge     — только Caddy: сюда приходят 80/443 из интернета;
+#   internal — API, worker, Postgres, Silo, Mailpit. Наружу не маршрутизируется.
+# API, Postgres, Silo и Mailpit не имеют публикации портов, кроме loopback
+# для отладки через SSH-туннель (5433) и просмотра писем (8025).
 name: staynest
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
 
 services:
   caddy:
@@ -20,10 +32,36 @@ services:
     volumes:
       - caddy-data:/data
       - caddy-config:/config
+    networks:
+      - edge
+      - internal
     depends_on:
       api:
         condition: service_healthy
+      silo:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - --spider
+        - http://127.0.0.1:2019/config/
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
     mem_limit: 128m
+    logging: *logging
 
   api:
     image: staynest-api:latest
@@ -42,6 +80,8 @@ services:
       APP_WEB_URL: https://${DOMAIN:?DOMAIN is required}
     expose:
       - '3100'
+    networks:
+      - internal
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,7 +95,15 @@ services:
       timeout: 5s
       retries: 6
       start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     mem_limit: 384m
+    logging: *logging
 
   worker:
     image: staynest-api:latest
@@ -71,10 +119,20 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: '1025'
       APP_WEB_URL: https://${DOMAIN:?DOMAIN is required}
+    networks:
+      - internal
     depends_on:
       postgres:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     mem_limit: 192m
+    logging: *logging
 
   postgres:
     # postgres:16-alpine, digest на 2026-10-19
@@ -89,12 +147,17 @@ services:
       - '127.0.0.1:5433:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 5s
       timeout: 5s
       retries: 10
+    security_opt:
+      - no-new-privileges:true
     mem_limit: 512m
+    logging: *logging
 
   silo:
     # pgsty/silo, digest на 2026-10-19 (см. ADR-021)
@@ -106,18 +169,45 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     volumes:
       - silo-data:/data
+    networks:
+      - internal
     healthcheck:
       test: ['CMD-SHELL', 'curl -fsS http://localhost:9000/minio/health/live || exit 1']
       interval: 10s
       timeout: 5s
       retries: 10
+    security_opt:
+      - no-new-privileges:true
     mem_limit: 256m
+    logging: *logging
 
   mailpit:
     # axllent/mailpit, digest на 2026-10-19
     image: axllent/mailpit@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
     restart: unless-stopped
+    environment:
+      # Письма нужны только для проверки сценариев на staging.
+      MP_MAX_MESSAGES: '500'
+    ports:
+      # Веб-интерфейс писем только на loopback. Доступ — через SSH-туннель:
+      #   ssh -N -L 8025:127.0.0.1:8025 staynest
+      - '127.0.0.1:8025:8025'
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:8025/livez || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
     mem_limit: 64m
+    logging: *logging
+
+networks:
+  edge:
+  internal:
+    internal: true
 
 volumes:
   postgres-data:

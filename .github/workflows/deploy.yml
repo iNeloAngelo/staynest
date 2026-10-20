@@ -1,0 +1,64 @@
+name: Deploy
+
+# Выкатка на VPS по тегу или кнопкой (workflow_dispatch).
+# Секреты репозитория (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST     — IP или домен сервера
+#   DEPLOY_USER     — deploy
+#   DEPLOY_SSH_KEY  — приватный ключ (ed25519) пользователя deploy
+#   DEPLOY_PATH     — /opt/staynest (необязательно)
+#   DEPLOY_URL      — https://домен для проверки /health (необязательно)
+# На сервере ветка/тег выкатывается скриптом scripts/deploy.sh (git checkout --force).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Тег или ветка для выкатки'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+    steps:
+      - name: Prepare SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref_name }}
+        run: |
+          case "$DEPLOY_REF" in
+            *"'"*|*' '*|*';'*|*'&'*|*'|'*) echo "Недопустимый ref"; exit 1 ;;
+          esac
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd '${DEPLOY_PATH:-/opt/staynest}' && DEPLOY_REF='$DEPLOY_REF' ./scripts/deploy.sh"
+
+      - name: Verify site
+        if: env.DEPLOY_URL != ''
+        run: curl -fsS --max-time 15 --retry 5 --retry-delay 3 "$DEPLOY_URL/api/v1/health" | tee /dev/stderr | grep -q '"db":"up"'

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Деплой текущей ветки на VPS. Запускать из корня репозитория на сервере:
-#   ./scripts/deploy.sh
+# Деплой на VPS. Запускать из корня репозитория на сервере:
+#   ./scripts/deploy.sh                 # обновить текущую ветку (git pull --ff-only)
+#   DEPLOY_REF=v1.2.3 ./scripts/deploy.sh  # перейти на тег/коммит (CI/CD)
 # Требования: git-доступ к репозиторию, .env рядом с compose, пользователь в группе docker.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 COMPOSE=(docker compose --env-file .env -f infra/docker-compose.prod.yml)
+DEPLOY_REF="${DEPLOY_REF:-}"
 
 if [[ ! -f .env ]]; then
   echo "Нет .env: скопируйте .env.example и заполните секреты." >&2
@@ -23,8 +25,14 @@ if grep -qE '^(CORS_ORIGINS|APP_WEB_URL)=.*(localhost|127\.0\.0\.1)' .env; then
   exit 1
 fi
 
-echo "== git pull =="
-git pull --ff-only
+if [[ -n "$DEPLOY_REF" ]]; then
+  echo "== checkout $DEPLOY_REF =="
+  git fetch --tags --force origin
+  git checkout --force "$DEPLOY_REF"
+else
+  echo "== git pull =="
+  git pull --ff-only
+fi
 
 echo "== build =="
 "${COMPOSE[@]}" build
@@ -50,3 +58,17 @@ docker image prune -f >/dev/null
 
 echo "== status =="
 "${COMPOSE[@]}" ps
+
+DOMAIN=$(grep -E '^DOMAIN=' .env | cut -d= -f2- | tr -d '"')
+if [[ -n "$DOMAIN" ]]; then
+  echo "== health =="
+  for _ in $(seq 1 30); do
+    if curl -fsS --max-time 5 "https://$DOMAIN/api/v1/health" | grep -q '"db":"up"'; then
+      echo "health: ok"
+      exit 0
+    fi
+    sleep 2
+  done
+  echo "health: не отвечает, смотрите docker compose logs api caddy" >&2
+  exit 1
+fi
