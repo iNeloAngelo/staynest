@@ -50,7 +50,7 @@ export function BookingTabs<T extends string>({
       aria-label={t('booking.tabs.label')}
       tabIndex={-1}
       onKeyDown={onKeyDown}
-      className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+      className="-mx-4 flex gap-0.5 overflow-x-auto px-2 pb-1 sm:mx-0 sm:px-0"
     >
       {tabs.map((tab) => (
         <button
