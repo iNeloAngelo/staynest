@@ -107,11 +107,12 @@ apps/web/src/
 | `booking.requested` | `bookings` | `notifications` (хозяину) |
 | `booking.confirmed` / `booking.declined` | `bookings` | `notifications` (гостю) |
 | `booking.cancelled` | `bookings` | `notifications` (второй стороне) |
-| `booking.expired` | `bookings` (джоб) | `notifications` |
-| `booking.completed` | `bookings` (джоб) | `dashboard` (при необходимости кэша) |
+| `booking.expired` | `bookings` (джоб или истечение под блокировкой) | `notifications` (гостю) |
+| `booking.expiring_soon` | `bookings` (джоб) | `notifications` (хозяину, дедупликация) |
+| `booking.completed` | `bookings` (джоб) | `notifications` (гостю), `dashboard` (при необходимости кэша) |
 | `listing.published` | `listings` | пока никто (задел) |
 
-Для надёжности доставки уведомлений критичные события дополнительно кладутся в очередь pg-boss (повтор при ошибке).
+События `booking.*` несут готовые поля для уведомлений (`listingTitle`, даты, имя гостя, сумма), поэтому `notifications` не читает таблицы броней (ADR-072). Доставка в SSE-хаб живёт в памяти процесса; повторная доставка через pg-boss и общий broker для нескольких инстансов — Backlog (ADR-070).
 
 ## 6. Ограничения размера и сложности (проверяет линтер и CI)
 

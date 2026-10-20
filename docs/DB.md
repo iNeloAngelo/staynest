@@ -19,6 +19,7 @@ PostgreSQL 16. Источник правды: SQL-миграции в `db/migrat
 | `0007_listing_drafts` | незаполненные черновики объявлений: nullable-поля и CHECK полноты для `published`/`archived` |
 | `0008_catalog_search_indexes` | функциональные индексы по `lower(city)` под поиск и сортировку каталога |
 | `0009_booking_engine` | конечные границы `daterange`, индекс pending-заявок гостя, строгий порядок `booking_events` по `id` |
+| `0010_notifications_dedupe` | `notifications.dedupe_key` и частичный уникальный индекс для напоминаний об истечении заявки |
 
 ```bash
 pnpm db:reset        # пересоздать базу разработки: drop schema, миграции, сид
@@ -535,12 +536,19 @@ CREATE TABLE notifications (
   user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type       text NOT NULL,
   payload    jsonb NOT NULL DEFAULT '{}',   -- booking_id, listing_id, заголовок и т.д.
+  dedupe_key text,                          -- защита от повторного напоминания
   read_at    timestamptz,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX notifications_user_idx   ON notifications (user_id, created_at DESC);
 CREATE INDEX notifications_unread_idx ON notifications (user_id) WHERE read_at IS NULL;
+CREATE UNIQUE INDEX notifications_dedupe_uq ON notifications (user_id, dedupe_key)
+  WHERE dedupe_key IS NOT NULL;
 ```
+
+`dedupe_key` заполняется только для фоновых напоминаний (`expiring:<booking_id>`),
+поэтому джоб «заявка скоро истечёт» не создаёт вторую строку при повторном
+запуске. Напоминание уходит хозяину за 3 часа до `expires_at`.
 
 ## 15. push_subscriptions — Web Push
 
