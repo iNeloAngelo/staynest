@@ -35,7 +35,13 @@
   токена бота на стенде нет, поэтому канал выключен; PWA и вход по email работают.
   `deploy.sh` теперь сам генерирует заглушечный `PAYMENT_WEBHOOK_SECRET` для
   мок-провайдера: без него API в production не стартовал (fail-closed).
-  CSP Caddy разрешает `frame-ancestors` только `web.telegram.org` и `*.telegram.org`. Секреты `DEPLOY_*` добавлены в GitHub Actions.
+  CSP Caddy разрешает `frame-ancestors` только `web.telegram.org`.
+- 2026-10-20 (С18–С19): стенд выкачен на commit `c2ba156`: миграция `0011`
+  (депозит), мок-платежи, Telegram-модуль и локальный SDK Mini App. В `.env`
+  добавлен сгенерированный `PAYMENT_WEBHOOK_SECRET` (реальные ключи ЮKassa не
+  используются), `TELEGRAM_BOT_TOKEN` пуст. Проверено: `/health` — `db: up`,
+  вход демо-гостем, `/me`, «Мои поездки», каталог, CSP с Telegram, `/auth/telegram`
+  отвечает `503 telegram_disabled`; e2e бронирования зелёный. Секреты `DEPLOY_*` добавлены в GitHub Actions.
 
 ## 2. Целевая конфигурация
 
