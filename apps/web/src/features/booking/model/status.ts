@@ -54,8 +54,9 @@ export function hostStatusesOf(tab: HostTab): BookingStatus[] {
   return HOST_TAB_STATUSES[tab];
 }
 
-export function canGuestCancel(status: BookingStatus): boolean {
-  return status === 'pending' || status === 'confirmed';
+export function canGuestCancel(status: BookingStatus, checkIn: string, today: string): boolean {
+  if (status === 'pending') return true;
+  return status === 'confirmed' && checkIn > today;
 }
 
 export function canHostDecide(status: BookingStatus): boolean {

@@ -3,7 +3,7 @@ import { ImageOff, MapPin, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLocale } from '../../../shared/i18n';
-import { formatShortDate } from '../../../shared/lib/dates';
+import { formatShortDate, todayLocalIso } from '../../../shared/lib/dates';
 import { formatMoney } from '../../../shared/lib/format';
 import { canGuestCancel, canHostCancel, canHostDecide } from '../model/status';
 import { BookingActions } from './BookingActions';
@@ -12,7 +12,7 @@ import { BookingStatusBadge } from './BookingStatusBadge';
 function Cover({ url, title }: { url: string | null; title: string }) {
   if (!url) {
     return (
-      <span className="flex h-24 w-28 shrink-0 items-center justify-center rounded-md bg-surface-2 text-ink-muted">
+      <span className="flex h-24 w-32 shrink-0 items-center justify-center rounded-md bg-surface-2 text-ink-muted">
         <ImageOff className="size-6" aria-hidden="true" />
       </span>
     );
@@ -25,8 +25,32 @@ function Cover({ url, title }: { url: string | null; title: string }) {
       width={160}
       height={120}
       loading="lazy"
-      className="h-24 w-28 shrink-0 rounded-md object-cover"
+      className="h-24 w-32 shrink-0 rounded-md object-cover"
     />
+  );
+}
+
+function PendingExpiry({
+  expiresAt,
+  status,
+}: {
+  expiresAt: string | null;
+  status: BookingSummary['status'];
+}) {
+  const { t } = useTranslation();
+  if (status !== 'pending' || !expiresAt) return null;
+
+  const hours = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 3_600_000);
+  if (!Number.isFinite(hours) || hours <= 0) return null;
+
+  return (
+    <p
+      className={
+        hours < 3 ? 'text-small font-medium text-warning-ink' : 'text-small text-ink-muted'
+      }
+    >
+      {t('booking.card.expires', { count: hours })}
+    </p>
   );
 }
 
@@ -37,15 +61,18 @@ function BookingMeta({ booking, viewer }: { booking: BookingSummary; viewer: 'gu
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="min-w-0 text-h3 text-ink">{booking.listing.title}</h2>
+        <h2 className="line-clamp-2 min-w-0 text-h3 text-ink">{booking.listing.title}</h2>
         <BookingStatusBadge status={booking.status} />
       </div>
 
       {viewer === 'host' ? (
-        <p className="inline-flex items-center gap-1 text-small text-ink">
-          <UserRound className="size-4 text-ink-muted" aria-hidden="true" />
-          {t('booking.card.guest', { name: booking.guest.displayName })}
-        </p>
+        <>
+          <p className="inline-flex items-center gap-1 text-small text-ink">
+            <UserRound className="size-4 text-ink-muted" aria-hidden="true" />
+            {t('booking.card.guest', { name: booking.guest.displayName })}
+          </p>
+          <PendingExpiry expiresAt={booking.expiresAt} status={booking.status} />
+        </>
       ) : null}
 
       {booking.listing.city ? (
@@ -80,7 +107,7 @@ export function BookingCard({
 }) {
   const actionable =
     viewer === 'guest'
-      ? canGuestCancel(booking.status)
+      ? canGuestCancel(booking.status, booking.checkIn, todayLocalIso())
       : canHostDecide(booking.status) || canHostCancel(booking.status);
 
   return (

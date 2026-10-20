@@ -694,4 +694,62 @@ describe('App', () => {
     );
     expect(screen.getByRole('heading', { name: 'История брони' })).toBeInTheDocument();
   });
+
+  it('отклоняет заявку с комментарием', async () => {
+    const comments: unknown[] = [];
+    mockApi({
+      user: demoUser,
+      bookings: [demoBooking('pending')],
+      onRequest: (url, init) => {
+        if (url.endsWith('/decline') && init?.body) {
+          comments.push(JSON.parse(String(init.body)));
+        }
+      },
+    });
+    const user = userEvent.setup();
+    renderApp(['/host/requests']);
+
+    await user.click(await screen.findByRole('button', { name: 'Отклонить' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Отклонить заявку' });
+    await user.type(within(dialog).getByLabelText('Комментарий для гостя'), 'Эти даты уже заняты');
+    await user.click(within(dialog).getByRole('button', { name: 'Отклонить' }));
+
+    expect(await screen.findByText('Заявка отклонена')).toBeInTheDocument();
+    expect(comments[0]).toEqual({ comment: 'Эти даты уже заняты' });
+  });
+
+  it('требует причину при отмене подтверждённой брони хозяином', async () => {
+    mockApi({ user: demoUser, bookings: [demoBooking('confirmed')] });
+    const user = userEvent.setup();
+    renderApp(['/host/requests']);
+
+    await user.click(await screen.findByRole('tab', { name: /Подтверждённые/ }));
+    await user.click(await screen.findByRole('button', { name: 'Отменить бронь' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Отменить подтверждённую бронь' });
+    await user.click(within(dialog).getByRole('button', { name: 'Отменить бронь' }));
+
+    expect(await within(dialog).findByText('Укажите причину отмены.')).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText('Причина отмены'), 'Заболел');
+    await user.click(within(dialog).getByRole('button', { name: 'Отменить бронь' }));
+
+    expect(await screen.findByText('Бронь отменена, гость увидит причину')).toBeInTheDocument();
+  });
+
+  it('объясняет офлайн и блокирует отправку заявки', async () => {
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    mockApi({ user: demoUser });
+    const user = userEvent.setup();
+    renderApp([`/listings/${demoPublicListing.id}`]);
+
+    await screen.findByRole('heading', { name: 'Даты и стоимость' });
+    const checkIn = addDays(todayLocalIso(), 1);
+    const checkOut = addDays(todayLocalIso(), 3);
+    await user.click(findDayButton(checkIn));
+    await user.click(findDayButton(checkOut));
+    await screen.findByText('Итого');
+
+    expect(screen.getByText(/Нет сети\. Отправить заявку/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Отправить заявку' })).toBeDisabled();
+  });
 });

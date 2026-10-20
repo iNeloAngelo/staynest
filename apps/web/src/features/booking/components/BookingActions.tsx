@@ -2,6 +2,7 @@ import type { BookingStatus } from '@staynest/shared';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useOnline } from '../../../shared/lib/useOnline';
+import { todayLocalIso } from '../../../shared/lib/dates';
 import { Button, useToast } from '../../../shared/ui';
 import { useCancelBooking, useConfirmBooking, useDeclineBooking } from '../api/bookings-hooks';
 import { bookingErrorText } from '../model/errors';
@@ -9,7 +10,7 @@ import { canGuestCancel, canHostCancel, canHostDecide } from '../model/status';
 import { BookingActionDialog } from './BookingActionDialog';
 import type { BookingActionKind } from './BookingActionDialog';
 
-type ActionTarget = { id: string; status: BookingStatus };
+type ActionTarget = { id: string; status: BookingStatus; checkIn: string };
 
 const SUCCESS_KEYS = {
   confirm: 'booking.toast.confirmed',
@@ -51,7 +52,7 @@ function ActionButtons({
           </Button>
         ) : null}
 
-        {role === 'guest' && canGuestCancel(booking.status) ? (
+        {role === 'guest' && canGuestCancel(booking.status, booking.checkIn, todayLocalIso()) ? (
           <Button variant="secondary" onClick={() => onStart('cancel-guest')} disabled={!online}>
             {booking.status === 'pending'
               ? t('booking.actions.cancelGuest')

@@ -2,6 +2,7 @@ import type { BookingEvent } from '@staynest/shared';
 import { useTranslation } from 'react-i18next';
 import type { TranslationKey } from '../../../shared/i18n';
 import { useLocale } from '../../../shared/i18n';
+import { formatDateTime } from '../../../shared/lib/dates';
 import { BookingStatusBadge } from './BookingStatusBadge';
 
 const ACTOR_KEYS: Record<BookingEvent['actorRole'], TranslationKey> = {
@@ -9,18 +10,6 @@ const ACTOR_KEYS: Record<BookingEvent['actorRole'], TranslationKey> = {
   host: 'booking.timeline.actorHost',
   system: 'booking.timeline.actorSystem',
 };
-
-function formatMoment(value: string, language: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return new Intl.DateTimeFormat(language.startsWith('en') ? 'en-US' : 'ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
 
 export function BookingTimeline({ events }: { events: BookingEvent[] }) {
   const { t } = useTranslation();
@@ -50,7 +39,7 @@ export function BookingTimeline({ events }: { events: BookingEvent[] }) {
               <div className="flex flex-wrap items-center gap-2">
                 <BookingStatusBadge status={event.toStatus} />
                 <span className="text-caption text-ink-muted">
-                  {formatMoment(event.createdAt, locale)}
+                  {formatDateTime(event.createdAt, locale)}
                 </span>
               </div>
               <p className="text-small text-ink-muted">{t(ACTOR_KEYS[event.actorRole])}</p>

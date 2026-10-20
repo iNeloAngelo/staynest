@@ -87,6 +87,7 @@ function eventOf(row: BookingEventRow, guestId: string, hostId: string): Booking
  */
 function contactsOf(row: BookingDetailRow, viewerId: string): BookingContacts | null {
   if (row.status !== 'confirmed' && row.status !== 'completed') return null;
+  if (viewerId !== row.guest_id && viewerId !== row.listing_owner_id) return null;
 
   const viewerIsGuest = viewerId === row.guest_id;
 

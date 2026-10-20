@@ -1,11 +1,14 @@
 import { CalendarX, ShieldAlert } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../../../shared/api';
+import { todayLocalIso } from '../../../shared/lib/dates';
 import { useMe } from '../../auth';
 import { Button, EmptyState } from '../../../shared/ui';
 import { Skeleton } from '../../../shared/ui/Skeleton';
 import { useBooking } from '../api/bookings-hooks';
+import { canGuestCancel, canHostCancel, canHostDecide } from '../model/status';
 import { BookingActions } from './BookingActions';
 import {
   BookingContacts,
@@ -60,9 +63,17 @@ function DetailError({ notFound, onRetry }: { notFound: boolean; onRetry: () => 
 
 export function BookingDetailView() {
   const { id } = useParams<{ id: string }>();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const [created] = useState(() => params.get('created') === '1');
   const { data: user } = useMe();
   const query = useBooking(id);
+
+  useEffect(() => {
+    if (!params.has('created')) return;
+    const next = new URLSearchParams(params);
+    next.delete('created');
+    setParams(next, { replace: true });
+  }, [params, setParams]);
 
   if (query.isPending) return <DetailSkeleton />;
 
@@ -77,12 +88,16 @@ export function BookingDetailView() {
 
   const booking = query.data;
   const role = bookingRoleOf(booking, user?.id);
+  const actionable =
+    role === 'guest'
+      ? canGuestCancel(booking.status, booking.checkIn, todayLocalIso())
+      : canHostDecide(booking.status) || canHostCancel(booking.status);
 
   return (
     <article className="flex flex-col gap-6">
       <BookingHeading booking={booking} role={role} />
 
-      {params.get('created') ? <CreatedNotice booking={booking} role={role} /> : null}
+      {created ? <CreatedNotice booking={booking} role={role} /> : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div className="flex flex-col gap-6">
@@ -93,9 +108,11 @@ export function BookingDetailView() {
 
         <aside className="flex flex-col gap-4">
           <BookingPrice booking={booking} />
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <BookingActions booking={booking} role={role} />
-          </div>
+          {actionable ? (
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <BookingActions booking={booking} role={role} />
+            </div>
+          ) : null}
         </aside>
       </div>
     </article>

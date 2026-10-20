@@ -30,7 +30,7 @@ export function TripsView() {
   const visible = groupByStatus(bookings, statusesOf(tab));
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-h1 text-ink">{t('pages.trips.title')}</h1>
         <p className="text-small text-ink-muted">{t('booking.list.guestSubtitle')}</p>

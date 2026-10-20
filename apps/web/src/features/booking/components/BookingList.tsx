@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../../../shared/ui/Button';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { Skeleton } from '../../../shared/ui/Skeleton';
+import { useOnline } from '../../../shared/lib/useOnline';
 import { BookingCard } from './BookingCard';
 
 export type BookingTabItem<T extends string> = {
@@ -61,12 +62,12 @@ export function BookingTabs<T extends string>({
           onClick={() => onChange(tab.id)}
           className={
             tab.id === active
-              ? 'shrink-0 rounded-full bg-primary px-4 py-2 text-small font-semibold text-on-primary'
-              : 'shrink-0 rounded-full bg-surface-2 px-4 py-2 text-small font-medium text-ink-muted hover:text-ink'
+              ? 'inline-flex min-h-11 shrink-0 items-center rounded-full bg-primary px-4 text-small font-semibold text-on-primary'
+              : 'inline-flex min-h-11 shrink-0 items-center rounded-full bg-surface-2 px-4 text-small font-medium text-ink-muted hover:text-ink'
           }
         >
           {tab.label}
-          <span className="ml-1.5 tabular-nums opacity-80">{tab.count}</span>
+          <span className="ml-1.5 tabular-nums">{tab.count}</span>
         </button>
       ))}
     </div>
@@ -90,15 +91,15 @@ function ListSkeleton() {
   );
 }
 
-function ListError({ onRetry }: { onRetry: () => void }) {
+function ListError({ onRetry, online }: { onRetry: () => void; online: boolean }) {
   const { t } = useTranslation();
 
   return (
     <div className="flex flex-col items-start gap-3">
       <p role="alert" className="text-small text-danger">
-        {t('booking.list.error')}
+        {online ? t('booking.list.error') : t('booking.list.offline')}
       </p>
-      <Button variant="secondary" onClick={onRetry}>
+      <Button variant="secondary" onClick={onRetry} disabled={!online}>
         {t('common.retry')}
       </Button>
     </div>
@@ -127,17 +128,25 @@ export function BookingList({
   onLoadMore: () => void;
 }) {
   const { t } = useTranslation();
+  const online = useOnline();
 
   if (loading) return <ListSkeleton />;
-  if (error) return <ListError onRetry={onRetry} />;
+  if (error) return <ListError onRetry={onRetry} online={online} />;
   if (bookings.length === 0) {
     return (
-      <EmptyState
-        icon={<CalendarX className="size-6" aria-hidden="true" />}
-        title={t('booking.list.emptyTitle')}
-        description={t('booking.list.emptyBody')}
-        action={empty}
-      />
+      <div className="flex flex-col gap-3">
+        <EmptyState
+          icon={<CalendarX className="size-6" aria-hidden="true" />}
+          title={t('booking.list.emptyTitle')}
+          description={t('booking.list.emptyBody')}
+          action={empty}
+        />
+        {hasNextPage ? (
+          <Button variant="secondary" loading={loadingMore} onClick={onLoadMore}>
+            {t('booking.list.more')}
+          </Button>
+        ) : null}
+      </div>
     );
   }
 

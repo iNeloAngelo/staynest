@@ -115,10 +115,14 @@ function BookingDatesSection({
   listing,
   selection,
   heading,
+  onReset,
+  onSelect,
 }: {
   listing: PublicListing;
   selection: Selection;
   heading: boolean;
+  onReset: () => void;
+  onSelect: (date: Date) => void;
 }) {
   const { t, i18n } = useTranslation();
   const { calendar, range, guests, setGuests, quote, hint } = selection;
@@ -130,14 +134,10 @@ function BookingDatesSection({
         heading={heading}
         minNights={calendar.minNights}
         hasRange={Boolean(range?.from)}
-        onReset={selection.reset}
+        onReset={onReset}
       />
       <SelectedDates range={range} language={i18n.language} />
-      <BookingCalendar
-        calendar={calendar}
-        selected={toDayPickerRange(range)}
-        onSelect={selection.handleSelect}
-      />
+      <BookingCalendar calendar={calendar} selected={toDayPickerRange(range)} onSelect={onSelect} />
       <CalendarLegend />
 
       <p role="status" aria-live="polite" className="min-h-5 text-small text-ink-muted">
@@ -162,10 +162,12 @@ function BookingSubmitSection({
   selection,
   request,
   canSubmit,
+  onReset,
 }: {
   selection: Selection;
   request: Request;
   canSubmit: boolean;
+  onReset: () => void;
 }) {
   const { t } = useTranslation();
   const { message, setMessage } = selection;
@@ -186,6 +188,12 @@ function BookingSubmitSection({
       />
       <HowItWorks />
 
+      {!request.online ? (
+        <p role="status" className="text-small text-ink-muted">
+          {t('booking.offlineForm')}
+        </p>
+      ) : null}
+
       {request.error ? (
         <div
           role="alert"
@@ -193,7 +201,7 @@ function BookingSubmitSection({
         >
           <p>{request.error}</p>
           {request.conflict ? (
-            <Button variant="secondary" className="mt-2" onClick={selection.reset}>
+            <Button variant="secondary" className="mt-2" onClick={onReset}>
               {t('booking.clear')}
             </Button>
           ) : null}
@@ -224,12 +232,37 @@ function BookingPanelBody({
   request: Request;
   heading: boolean;
 }) {
-  const canSubmit = Boolean(selection.quote.data) && !selection.quote.isFetching && request.online;
+  const canSubmit =
+    Boolean(selection.quote.data) &&
+    !selection.quote.isFetching &&
+    !selection.quote.isError &&
+    request.online;
+
+  function reset(): void {
+    selection.reset();
+    request.clearError();
+  }
+
+  function selectDate(date: Date): void {
+    selection.handleSelect(date);
+    request.clearError();
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <BookingDatesSection listing={listing} selection={selection} heading={heading} />
-      <BookingSubmitSection selection={selection} request={request} canSubmit={canSubmit} />
+      <BookingDatesSection
+        listing={listing}
+        selection={selection}
+        heading={heading}
+        onReset={reset}
+        onSelect={selectDate}
+      />
+      <BookingSubmitSection
+        selection={selection}
+        request={request}
+        canSubmit={canSubmit}
+        onReset={reset}
+      />
     </div>
   );
 }

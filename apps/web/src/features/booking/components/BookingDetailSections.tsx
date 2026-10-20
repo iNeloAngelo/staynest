@@ -3,7 +3,7 @@ import { CalendarDays, MapPin, MessageSquare, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLocale } from '../../../shared/i18n';
-import { formatLongDate } from '../../../shared/lib/dates';
+import { formatDateTime, formatLongDate } from '../../../shared/lib/dates';
 import { formatMoney } from '../../../shared/lib/format';
 import { buttonClassName } from '../../../shared/ui/buttonStyles';
 import { BookingStatusBadge } from './BookingStatusBadge';
@@ -16,16 +16,39 @@ export function bookingRoleOf(
   return userId === booking.guestId ? 'guest' : 'host';
 }
 
-function formatMoment(value: string, language: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+function BookingFacts({ booking }: { booking: BookingDetail }) {
+  const { t } = useTranslation();
+  const { locale } = useLocale();
 
-  return new Intl.DateTimeFormat(language.startsWith('en') ? 'en-US' : 'ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return (
+    <dl className="flex flex-col gap-2 text-body text-ink">
+      {booking.listing.city ? (
+        <div className="inline-flex items-center gap-2">
+          <MapPin className="size-5 shrink-0 text-ink-muted" aria-hidden="true" />
+          <dt className="sr-only">{t('booking.detail.city')}</dt>
+          <dd>{booking.listing.city}</dd>
+        </div>
+      ) : null}
+
+      <div className="inline-flex items-center gap-2">
+        <CalendarDays className="size-5 shrink-0 text-ink-muted" aria-hidden="true" />
+        <dt className="sr-only">{t('booking.detail.dates')}</dt>
+        <dd>
+          {formatLongDate(booking.checkIn, locale)} — {formatLongDate(booking.checkOut, locale)}
+          <span className="text-ink-muted">
+            {' '}
+            · {t('booking.nights', { count: booking.nights })}
+          </span>
+        </dd>
+      </div>
+
+      <div className="inline-flex items-center gap-2">
+        <Users className="size-5 shrink-0 text-ink-muted" aria-hidden="true" />
+        <dt className="sr-only">{t('booking.guests')}</dt>
+        <dd>{t('booking.card.guests', { count: booking.guestsCount })}</dd>
+      </div>
+    </dl>
+  );
 }
 
 export function BookingHeading({
@@ -41,7 +64,10 @@ export function BookingHeading({
 
   return (
     <header className="flex flex-col gap-3">
-      <Link to={back} className="text-small font-medium text-primary hover:text-primary-hover">
+      <Link
+        to={back}
+        className="inline-flex min-h-11 items-center text-small font-medium text-primary hover:text-primary-hover"
+      >
         ← {t(role === 'guest' ? 'booking.detail.backTrips' : 'booking.detail.backRequests')}
       </Link>
 
@@ -49,40 +75,21 @@ export function BookingHeading({
         <BookingStatusBadge status={booking.status} />
         <span className="text-caption text-ink-muted">
           {t('booking.detail.created', {
-            date: formatMoment(booking.createdAt, i18n.language),
+            date: formatDateTime(booking.createdAt, i18n.language),
           })}
         </span>
       </div>
 
+      {booking.status === 'pending' && booking.expiresAt ? (
+        <p className="text-small font-medium text-warning-ink">
+          {t('booking.detail.replyDeadline', {
+            date: formatDateTime(booking.expiresAt, i18n.language),
+          })}
+        </p>
+      ) : null}
+
       <h1 className="text-h1 text-ink">{booking.listing.title}</h1>
-
-      <dl className="flex flex-col gap-2 text-body text-ink">
-        {booking.listing.city ? (
-          <div className="inline-flex items-center gap-2">
-            <MapPin className="size-5 shrink-0 text-ink-muted" aria-hidden="true" />
-            <dt className="sr-only">{t('booking.detail.city')}</dt>
-            <dd>{booking.listing.city}</dd>
-          </div>
-        ) : null}
-
-        <div className="inline-flex items-center gap-2">
-          <CalendarDays className="size-5 shrink-0 text-ink-muted" aria-hidden="true" />
-          <dt className="sr-only">{t('booking.detail.dates')}</dt>
-          <dd>
-            {formatLongDate(booking.checkIn, locale)} — {formatLongDate(booking.checkOut, locale)}
-            <span className="text-ink-muted">
-              {' '}
-              · {t('booking.nights', { count: booking.nights })}
-            </span>
-          </dd>
-        </div>
-
-        <div className="inline-flex items-center gap-2">
-          <Users className="size-5 shrink-0 text-ink-muted" aria-hidden="true" />
-          <dt className="sr-only">{t('booking.guests')}</dt>
-          <dd>{t('booking.card.guests', { count: booking.guestsCount })}</dd>
-        </div>
-      </dl>
+      <BookingFacts booking={booking} />
 
       <p className="text-h2 text-ink tabular-nums">
         {formatMoney(booking.totalMinor, locale, booking.currency)}
@@ -107,7 +114,9 @@ export function CreatedNotice({
       <h2 className="text-h3 text-ink">{t('booking.created.title')}</h2>
       <p className="mt-1 text-small text-ink-muted">
         {booking.expiresAt
-          ? t('booking.created.deadline', { date: formatMoment(booking.expiresAt, i18n.language) })
+          ? t('booking.created.deadline', {
+              date: formatDateTime(booking.expiresAt, i18n.language),
+            })
           : t('booking.created.body')}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -140,7 +149,10 @@ function ContactRow({ label, value, href }: { label: string; value: string; href
       <dt className="text-small text-ink-muted">{label}</dt>
       <dd className="text-small font-medium text-ink">
         {href ? (
-          <a href={href} className="text-primary underline-offset-4 hover:underline">
+          <a
+            href={href}
+            className="inline-flex min-h-11 items-center text-primary underline-offset-4 hover:underline"
+          >
             {value}
           </a>
         ) : (
