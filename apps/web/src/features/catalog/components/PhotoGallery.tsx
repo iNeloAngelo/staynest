@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '../../../shared/lib/cn';
 import { IconButton } from '../../../shared/ui/IconButton';
 import { Modal } from '../../../shared/ui/Modal';
+import { GalleryPhoto } from './GalleryPhoto';
 
 type PhotoGalleryProps = {
   photos: ListingPhotoDto[];
@@ -14,55 +15,6 @@ type PhotoGalleryProps = {
 type PhotoListProps = PhotoGalleryProps & {
   onOpen: (index: number) => void;
 };
-
-function photoSrcSet(photo: ListingPhotoDto): string {
-  return `${photo.urls.thumb} 400w, ${photo.urls.md} 1000w, ${photo.urls.lg} 2000w`;
-}
-
-function GalleryPhoto({
-  photo,
-  title,
-  index,
-  className,
-  sizes,
-}: {
-  photo: ListingPhotoDto;
-  title: string;
-  index: number;
-  className?: string;
-  sizes?: string;
-}) {
-  const { t } = useTranslation();
-  const [failed, setFailed] = useState(false);
-
-  if (failed) {
-    return (
-      <div
-        className={cn(
-          'flex size-full items-center justify-center bg-surface-2 text-ink-muted',
-          className,
-        )}
-      >
-        <ImageOff className="size-8" aria-hidden="true" strokeWidth={1.5} />
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={photo.urls.md}
-      srcSet={photoSrcSet(photo)}
-      sizes={sizes}
-      alt={t('listing.photoAlt', { title, index: index + 1 })}
-      width={photo.width}
-      height={photo.height}
-      loading={index === 0 ? 'eager' : 'lazy'}
-      decoding="async"
-      onError={() => setFailed(true)}
-      className={cn('size-full object-cover', className)}
-    />
-  );
-}
 
 function EmptyGallery() {
   const { t } = useTranslation();
@@ -277,7 +229,7 @@ function Lightbox({
         <div className="flex flex-col gap-3">
           <img
             src={photo.urls.lg}
-            srcSet={photoSrcSet(photo)}
+            srcSet={`${photo.urls.thumb} 400w, ${photo.urls.md} 1000w, ${photo.urls.lg} 2000w`}
             sizes="100vw"
             alt={t('listing.photoAlt', { title, index: index + 1 })}
             width={photo.width}

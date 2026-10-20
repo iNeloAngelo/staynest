@@ -1,6 +1,6 @@
 import type { PublicListingSummary } from '@staynest/shared';
 import { House } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { useLocale } from '../../../shared/i18n';
@@ -10,12 +10,20 @@ import { FavoriteButton } from '../../favorites/components/FavoriteButton';
 function CardPhoto({ listing, eager }: { listing: PublicListingSummary; eager: boolean }) {
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
   const cover = failed ? null : listing.coverPhoto;
+
+  useEffect(() => {
+    const image = imgRef.current;
+    // Кэшированный 404 может завершиться до подписки React на onError.
+    if (image?.complete && image.naturalWidth === 0) setFailed(true);
+  }, [listing.id, listing.coverPhoto?.urls.md]);
 
   return (
     <div className="relative aspect-[4/3] overflow-hidden bg-surface-2">
       {cover ? (
         <img
+          ref={imgRef}
           src={cover.urls.md}
           srcSet={`${cover.urls.thumb} 400w, ${cover.urls.md} 1000w, ${cover.urls.lg} 2000w`}
           sizes="(min-width: 1280px) 360px, (min-width: 768px) 45vw, 100vw"
