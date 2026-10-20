@@ -109,14 +109,14 @@ RESTORED_BOOKINGS="$(docker exec "$PG_CONTAINER" psql -U "$PGUSER" -d "$RESTORE_
 PROD_USERS="$(docker exec "$PG_CONTAINER" psql -U "$PGUSER" -d "$PGDB" -tAc 'SELECT count(*) FROM users')"
 PROD_LISTINGS="$(docker exec "$PG_CONTAINER" psql -U "$PGUSER" -d "$PGDB" -tAc 'SELECT count(*) FROM listings')"
 PROD_BOOKINGS="$(docker exec "$PG_CONTAINER" psql -U "$PGUSER" -d "$PGDB" -tAc 'SELECT count(*) FROM bookings')"
-docker exec "$PG_CONTAINER" psql -U "$PGUSER" -d postgres -v ON_ERROR_STOP=1 \
-  -c "DROP DATABASE \"$RESTORE_DB\";" >/dev/null
-RESTORE_CREATED=""
 
 if [[ "$RESTORED_USERS" != "$PROD_USERS" || "$RESTORED_LISTINGS" != "$PROD_LISTINGS" || "$RESTORED_BOOKINGS" != "$PROD_BOOKINGS" ]]; then
   echo "Restore-check не совпал: users $RESTORED_USERS/$PROD_USERS, listings $RESTORED_LISTINGS/$PROD_LISTINGS, bookings $RESTORED_BOOKINGS/$PROD_BOOKINGS" >&2
   exit 1
 fi
+docker exec "$PG_CONTAINER" psql -U "$PGUSER" -d postgres -v ON_ERROR_STOP=1 \
+  -c "DROP DATABASE \"$RESTORE_DB\";" >/dev/null
+RESTORE_CREATED=""
 printf 'users=%s listings=%s bookings=%s\n' "$RESTORED_USERS" "$RESTORED_LISTINGS" "$RESTORED_BOOKINGS" > "$DAY_DIR/$DUMP_NAME.restore-check.txt"
 chmod 600 "$DAY_DIR/$DUMP_NAME.restore-check.txt"
 
