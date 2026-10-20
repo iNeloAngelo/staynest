@@ -113,6 +113,18 @@ async function createPublishedListing(request: APIRequestContext): Promise<strin
   return listingId;
 }
 
+async function checkFavorites(page: Page, listingId: string): Promise<void> {
+  await page.getByRole('button', { name: 'Добавить в избранное' }).click();
+  await expect(page.getByRole('button', { name: 'Убрать из избранного' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.goto('/favorites');
+  await expect(page.getByRole('heading', { name: 'Избранное', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Дом у озера для e2e' })).toBeVisible();
+  await page.goto(`/listings/${listingId}`);
+}
+
 test('хозяин публикует дом, гость бронирует, хозяин подтверждает, гость видит статус', async ({
   browser,
   request,
@@ -125,6 +137,9 @@ test('хозяин публикует дом, гость бронирует, х�
   await uiLogin(guestPage, guest.email);
   await guestPage.goto(`/listings/${listingId}`);
   await expect(guestPage.getByRole('heading', { name: 'Дом у озера для e2e' })).toBeVisible();
+
+  // Избранное: сердечко на карточке дома синхронизируется со страницей избранного.
+  await checkFavorites(guestPage, listingId);
 
   const checkIn = isoDate(10);
   const checkOut = isoDate(12);
@@ -147,6 +162,11 @@ test('хозяин публикует дом, гость бронирует, х�
   const hostNotifications = hostPage.getByRole('dialog', { name: 'Уведомления' });
   await expect(hostNotifications.getByText('Новая заявка')).toBeVisible();
   await hostPage.keyboard.press('Escape');
+
+  await hostPage.goto('/host');
+  await expect(hostPage.getByRole('heading', { name: 'Сводка', level: 1 })).toBeVisible();
+  await expect(hostPage.getByText('Заявок в ожидании')).toBeVisible();
+  await expect(hostPage.getByText('Занятость 30 дней')).toBeVisible();
 
   await hostPage.goto('/host/requests');
   await expect(hostPage.getByRole('heading', { name: 'Входящие заявки' })).toBeVisible();
