@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMe } from '../../auth';
 import { cn } from '../../../shared/lib/cn';
+import { useOnline } from '../../../shared/lib/useOnline';
 import { useToast } from '../../../shared/ui';
 import { useFavoriteIds, useToggleFavorite } from '../api/hooks';
 
@@ -23,9 +24,15 @@ export function FavoriteButton({ listingId, className }: FavoriteButtonProps) {
   const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+  const online = useOnline();
   const isFavorite = ids.includes(listingId);
 
   function onClick(): void {
+    if (!online) {
+      toast.show({ title: t('pwa.actionsOffline'), tone: 'error' });
+      return;
+    }
+
     if (!user) {
       const next = `${location.pathname}${location.search}`;
       navigate(`/login?next=${encodeURIComponent(next)}`);
@@ -42,12 +49,15 @@ export function FavoriteButton({ listingId, className }: FavoriteButtonProps) {
     <button
       type="button"
       onClick={onClick}
+      aria-disabled={!online}
+      title={online ? undefined : t('pwa.actionsOffline')}
       aria-pressed={isFavorite}
       aria-label={t(isFavorite ? 'favorites.remove' : 'favorites.add')}
       className={cn(
         'inline-flex size-11 items-center justify-center rounded-full border border-border bg-surface/90 shadow-sm backdrop-blur',
         'transition-colors duration-micro',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+        !online && 'cursor-not-allowed opacity-50',
         isFavorite ? 'text-danger' : 'text-ink-muted hover:text-danger',
         className,
       )}

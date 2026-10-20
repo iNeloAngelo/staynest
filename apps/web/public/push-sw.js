@@ -1,4 +1,7 @@
-/* Push-only service worker. В Сессии 15 его заменит Workbox из vite-plugin-pwa. */
+/*
+ * Обработчики Web Push подключаются к Workbox SW через importScripts,
+ * а в dev этот файл регистрируется как самостоятельный service worker.
+ */
 
 self.addEventListener('push', (event) => {
   let payload = {};
@@ -36,7 +39,13 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const existing = windows.find((client) => client.url.startsWith(self.location.origin));
+      const existing = windows.find((client) => {
+        try {
+          return new URL(client.url).origin === self.location.origin;
+        } catch {
+          return false;
+        }
+      });
 
       if (existing) {
         await existing.focus();

@@ -23,14 +23,14 @@ export function useLocalePreference() {
     if (next === locale) return;
 
     const previous = locale;
-    setLocale(next);
+    await setLocale(next);
     if (!user) return;
 
     setPending(true);
     try {
       await update.mutateAsync({ locale: next });
     } catch {
-      setLocale(previous);
+      await setLocale(previous);
       toast.show({ title: t('profile.saveError'), tone: 'error' });
     } finally {
       setPending(false);

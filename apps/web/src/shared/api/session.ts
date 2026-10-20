@@ -15,7 +15,12 @@ async function performRefresh(): Promise<RefreshOutcome> {
     });
 
     if (response.ok) return { kind: 'ok' };
-    if (response.status === 401 || response.status === 403) return { kind: 'unauthenticated' };
+    if (response.status === 401 || response.status === 403) {
+      // Тело 401 не нужно, но невычитанный body оставляет соединение занятым
+      // и мешает network idle (Lighthouse, e2e).
+      await response.text();
+      return { kind: 'unauthenticated' };
+    }
 
     return { kind: 'error', error: await toApiError(response) };
   } catch {

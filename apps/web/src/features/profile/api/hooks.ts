@@ -1,6 +1,7 @@
 import type { ChangePasswordInput, UpdateMeInput, UserDto } from '@staynest/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../../shared/api';
+import { endSessionLocally } from '../../auth';
 import {
   changePasswordRequest,
   removeAvatarRequest,
@@ -50,10 +51,6 @@ export function useChangePassword() {
 
   return useMutation({
     mutationFn: (input: ChangePasswordInput) => changePasswordRequest(input),
-    onSuccess: () => {
-      // Сервер уже отозвал сессии и очистил cookie: локальные данные не нужны.
-      queryClient.setQueryData(queryKeys.me, null);
-      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== queryKeys.me[0] });
-    },
+    onSuccess: () => endSessionLocally(queryClient),
   });
 }

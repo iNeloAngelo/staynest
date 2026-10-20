@@ -16,6 +16,11 @@
 	@assets path /assets/*
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 
+	# SW, его runtime-файлы, manifest и index.html должны перепроверяться:
+	# иначе браузер продолжит запускать старую оболочку и не увидит обновление.
+	@navigation not path /assets/* /media/* /api/*
+	header @navigation Cache-Control "no-cache"
+
 	handle /media/listings/* {
 		@notAllowed not method GET HEAD
 		respond @notAllowed 405

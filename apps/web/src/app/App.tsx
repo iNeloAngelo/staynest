@@ -1,43 +1,30 @@
 import { Suspense, lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { FavoritesPage } from '../pages/favorites/FavoritesPage';
-import { ForgotPasswordPage } from '../pages/forgot-password/ForgotPasswordPage';
-import { BookingPage } from '../pages/booking/BookingPage';
-import { HostListingsPage } from '../pages/host-listings/HostListingsPage';
-import { HostRequestsPage } from '../pages/host-requests/HostRequestsPage';
-import { LoginPage } from '../pages/login/LoginPage';
 import { NotFoundPage } from '../pages/not-found/NotFoundPage';
-import { ProfilePage } from '../pages/profile/ProfilePage';
-import { RegisterPage } from '../pages/register/RegisterPage';
-import { ResetPasswordPage } from '../pages/reset-password/ResetPasswordPage';
-import { TripsPage } from '../pages/trips/TripsPage';
-import { VerifyEmailPage } from '../pages/verify-email/VerifyEmailPage';
+import { OfflinePage } from '../pages/offline/OfflinePage';
+import { HomePage } from '../pages/home/HomePage';
+import {
+  BookingPage,
+  FavoritesPage,
+  ForgotPasswordPage,
+  HostCalendarPage,
+  HostDashboardPage,
+  HostListingsPage,
+  HostRequestsPage,
+  ListingEditorPage,
+  ListingPage,
+  LoginPage,
+  ProfilePage,
+  RegisterPage,
+  ResetPasswordPage,
+  TripsPage,
+  VerifyEmailPage,
+} from './lazyPages';
 import { AppLayout } from './layouts/AppLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { PageLoading } from './routes/PageLoading';
 import { RequireAuth } from './routes/RequireAuth';
 import { ScrollToTop } from './routes/ScrollToTop';
-
-// Тяжёлые экраны (календарь, мастер с загрузчиком фото, каталог) — отдельными чанками.
-const HomePage = lazy(() =>
-  import('../pages/home/HomePage').then((m) => ({ default: m.HomePage })),
-);
-const ListingPage = lazy(() =>
-  import('../pages/listing/ListingPage').then((m) => ({ default: m.ListingPage })),
-);
-const ListingEditorPage = lazy(() =>
-  import('../pages/listing-editor/ListingEditorPage').then((m) => ({
-    default: m.ListingEditorPage,
-  })),
-);
-const HostCalendarPage = lazy(() =>
-  import('../pages/host-calendar/HostCalendarPage').then((m) => ({ default: m.HostCalendarPage })),
-);
-const HostDashboardPage = lazy(() =>
-  import('../pages/host-dashboard/HostDashboardPage').then((m) => ({
-    default: m.HostDashboardPage,
-  })),
-);
 
 const DevUiPage = import.meta.env.DEV ? lazy(() => import('../pages/dev-ui/DevUiPage')) : null;
 
@@ -58,6 +45,7 @@ export function App() {
           <Route element={<AppLayout />}>
             <Route index element={<HomePage />} />
             <Route path="listings/:id" element={<ListingPage />} />
+            <Route path="offline" element={<OfflinePage />} />
 
             <Route element={<RequireAuth />}>
               <Route path="profile" element={<ProfilePage />} />

@@ -17,6 +17,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "e2e": "playwright test",
+    "e2e:pwa": "playwright test --config playwright.pwa.config.ts",
     "e2e:prepare": "node scripts/e2e-prepare.mjs",
     "depcheck": "depcruise apps packages --config .dependency-cruiser.cjs",
     "knip": "knip",

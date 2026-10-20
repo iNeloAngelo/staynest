@@ -422,7 +422,7 @@ describeDatabase('auth API', () => {
     expect(response.statusCode).toBe(401);
     expect(response.headers['content-type']).toContain('application/problem+json');
     expect(response.json()).toMatchObject({ code: 'unauthorized' });
-    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['cache-control']).toBe('private, no-store');
   });
 
   it('ротирует refresh и отзывает всю цепочку при повторном использовании', async () => {

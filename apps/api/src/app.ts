@@ -25,6 +25,7 @@ import type { Db } from './platform/db/index';
 import { createEventBus } from './platform/events/index';
 import type { EventBus } from './platform/events/index';
 import { problemErrorHandler, problemNotFoundHandler } from './platform/http/errors';
+import { isPrivateApiUrl, PRIVATE_CACHE_CONTROL } from './platform/http/cache';
 import { createOriginGuard } from './platform/http/origin';
 import { createNoopMailer } from './platform/mailer/index';
 import type { Mailer } from './platform/mailer/index';
@@ -140,6 +141,7 @@ export async function buildApp({ config, logger, db, ...deps }: AppDependencies)
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
     reply.header('permissions-policy', 'camera=(), microphone=(), geolocation=()');
+    if (isPrivateApiUrl(request.url)) reply.header('cache-control', PRIVATE_CACHE_CONTROL);
   });
 
   app.addHook('onRequest', createOriginGuard(config.corsOrigins));

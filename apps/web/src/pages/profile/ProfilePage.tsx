@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { authErrorKey, useLogout, useMe } from '../../features/auth';
 import { ModeSwitchControl } from '../../features/mode-switch';
-import { PushToggle, detachCurrentDevicePush } from '../../features/notifications';
+import { PushToggle } from '../../features/notifications';
 import {
   PasswordCard,
   ProfileAvatar,
@@ -82,7 +82,6 @@ export function ProfilePage() {
 
   async function onLogout(): Promise<void> {
     try {
-      await detachCurrentDevicePush();
       await logout.mutateAsync();
       toast.show({ title: t('toast.logoutSuccess'), tone: 'success' });
       navigate('/', { replace: true });

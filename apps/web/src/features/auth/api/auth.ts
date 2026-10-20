@@ -9,14 +9,28 @@ import type {
   VerifyEmailInput,
 } from '@staynest/shared';
 import { ApiError, api } from '../../../shared/api';
+import { detachCurrentDevicePush } from '../../notifications';
+import { clearPrivateClientData } from '../../pwa';
+import { forgetSessionOwner, hasRememberedSession } from '../model/session';
 
-export async function fetchMe(): Promise<UserDto | null> {
+export async function fetchMe(signal?: AbortSignal): Promise<UserDto | null> {
   try {
-    const response = await api.get<UserResponse>('/me');
+    const response = await api.get<UserResponse>('/me', { signal });
     return response.user;
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return null;
-    throw error;
+    if (!(error instanceof ApiError && error.status === 401)) throw error;
+
+    // Сессия истекла или отозвана: на общем устройстве нельзя оставлять
+    // прежние кэши и push-подписку до следующего входа.
+    // QueryClient не трогаем: очистка кэша изнутри queryFn оставит useMe
+    // в состоянии pending. Приватные данные в памяти закроет следующий вход.
+    if (hasRememberedSession()) {
+      forgetSessionOwner();
+      void detachCurrentDevicePush().catch(() => undefined);
+      await clearPrivateClientData();
+    }
+
+    return null;
   }
 }
 

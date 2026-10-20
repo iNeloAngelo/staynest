@@ -63,7 +63,9 @@ async function subscribeCurrentDevice(
 
   if (permission !== 'granted') return 'notifications.push.errorDenied';
 
-  const registration = await navigator.serviceWorker.register('/sw.js');
+  const registration = await navigator.serviceWorker.register(
+    import.meta.env.DEV ? '/push-sw.js' : '/sw.js',
+  );
   await navigator.serviceWorker.ready;
 
   const existing = await registration.pushManager.getSubscription();

@@ -5,8 +5,12 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './app/App';
 import { AppProviders } from './app/AppProviders';
+import { initInstallPrompt } from './features/pwa';
 import './shared/i18n';
 import './styles.css';
+
+// Событие установки может прийти до монтирования React-дерева.
+initInstallPrompt();
 
 const rootElement = document.getElementById('root');
 

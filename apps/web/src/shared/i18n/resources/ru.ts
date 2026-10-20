@@ -923,6 +923,28 @@ export const ru = {
   'notifications.push.errorDenied': 'Без разрешения браузера push включить нельзя.',
   'notifications.push.errorUnavailable': 'Push на сервере не настроен.',
   'notifications.push.errorGeneric': 'Не удалось включить push. Попробуйте ещё раз.',
+
+  'pwa.offlineBanner': 'Нет сети. Показываем сохранённое.',
+  'pwa.actionsOffline': 'Действие недоступно без сети.',
+  'pwa.offline.title': 'Нет сети',
+  'pwa.offline.body':
+    'Открыть сохранённые избранное и поездки можно и без связи. Новые данные появятся, когда вернётся интернет.',
+  'pwa.offline.retry': 'Попробовать снова',
+  'pwa.offline.home': 'На главную',
+  'pwa.offline.details': 'Подробнее',
+  'pwa.update.title': 'Доступна новая версия StayNest',
+  'pwa.update.action': 'Обновить',
+  'pwa.update.later': 'Позже',
+  'pwa.install.title': 'StayNest как приложение',
+  'pwa.install.body': 'Избранное и поездки откроются даже без сети.',
+  'pwa.install.action': 'Установить',
+  'pwa.install.later': 'Не сейчас',
+  'pwa.install.iosTitle': 'Установка на iPhone',
+  'pwa.install.iosStep1': 'Нажмите «Поделиться» в Safari.',
+  'pwa.install.iosStep2': 'Выберите «На экран «Домой»».',
+  'pwa.install.iosStep3': 'Подтвердите «Добавить» — StayNest появится среди приложений.',
+  'pwa.install.iosNote': 'В других браузерах на iOS установка может быть недоступна.',
+  'pwa.install.iosClose': 'Понятно',
 } as const;
 
 export type TranslationKey = keyof typeof ru;

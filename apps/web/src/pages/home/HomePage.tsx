@@ -1,7 +1,7 @@
 import { House } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { CatalogView } from '../../features/catalog';
+import { CatalogView } from '../../features/catalog/components/CatalogView';
 import { useMode } from '../../features/mode-switch';
 import { EmptyState, buttonClassName } from '../../shared/ui';
 

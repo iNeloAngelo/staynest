@@ -64,6 +64,20 @@ async function appWithDb(status: 'up' | 'down') {
   return buildApp({ config, logger, db: dbWith(status) });
 }
 
+describe('Приватные ответы API', () => {
+  it('ставит private, no-store на /me и не меняет no-store у health', async () => {
+    const app = await appWithDb('up');
+
+    const me = await app.inject({ method: 'GET', url: '/api/v1/me' });
+    const health = await app.inject({ method: 'GET', url: '/api/v1/health' });
+
+    expect(me.headers['cache-control']).toBe('private, no-store');
+    expect(health.headers['cache-control']).toBe('no-store');
+
+    await app.close();
+  });
+});
+
 describe('GET /api/v1/health', () => {
   it('возвращает ok, когда база доступна', async () => {
     const app = await appWithDb('up');
@@ -115,6 +129,26 @@ describe('GET /api/v1/health', () => {
     expect(response.headers['content-type']).toContain('application/problem+json');
     expect(body).toMatchObject({ status: 500, code: 'internal_error' });
     expect(JSON.stringify(body)).not.toContain('secret internal detail');
+
+    await app.close();
+  });
+
+  it('не отдаёт публичный Cache-Control вместе с ошибкой', async () => {
+    const app = await appWithDb('up');
+    app.get('/public-error', async (_request, reply) => {
+      reply.header('cache-control', 'public, max-age=60');
+      throw new AppError({
+        status: 404,
+        code: 'listing_not_found',
+        title: 'Not Found',
+        detail: 'Объявление не найдено.',
+      });
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/public-error' });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['cache-control']).toBe('no-store');
 
     await app.close();
   });

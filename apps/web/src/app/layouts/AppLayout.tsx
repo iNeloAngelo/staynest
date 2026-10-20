@@ -12,6 +12,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation } from 'react-router-dom';
 import { ModeSwitchControl, useMode } from '../../features/mode-switch';
+import { InstallBanner, OfflineBanner, UpdateBanner } from '../../features/pwa';
 import { BottomNav } from '../../shared/ui/BottomNav';
 import type { BottomNavItem } from '../../shared/ui/BottomNav';
 import { AppHeader } from './AppHeader';
@@ -67,6 +68,10 @@ export function AppLayout() {
       </a>
 
       <AppHeader />
+
+      <OfflineBanner />
+      <UpdateBanner />
+      <InstallBanner />
 
       <div className="mx-auto w-full max-w-page px-4 pt-3 lg:hidden">
         <ModeSwitchControl fullWidth />

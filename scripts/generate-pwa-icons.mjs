@@ -35,9 +35,7 @@ function chunk(type, data) {
   return Buffer.concat([length, typeBuffer, data, checksum]);
 }
 
-function png(size, colorAt) {
-  const width = size;
-  const height = size;
+function png(width, height, colorAt) {
   const raw = Buffer.alloc((width * 4 + 1) * height);
 
   for (let y = 0; y < height; y += 1) {
@@ -67,6 +65,10 @@ function png(size, colorAt) {
     chunk('IDAT', deflateSync(raw, { level: 9 })),
     chunk('IEND', Buffer.alloc(0)),
   ]);
+}
+
+function pngSquare(size, colorAt) {
+  return png(size, size, colorAt);
 }
 
 function inRoundedSquare(px, py, radius) {
@@ -101,7 +103,7 @@ function iconColor(px, py, maskable) {
 
 function renderIcon(size, { maskable = false } = {}) {
   const samples = 3;
-  return png(size, (x, y) => {
+  return pngSquare(size, (x, y) => {
     let r = 0;
     let g = 0;
     let b = 0;
@@ -127,6 +129,50 @@ function renderIcon(size, { maskable = false } = {}) {
   });
 }
 
+// iOS splash: фон --bg и иконка приложения по центру.
+function renderSplash(width, height) {
+  const samples = 2;
+  const iconSize = Math.round(Math.min(width, height) * 0.3);
+  const left = Math.round((width - iconSize) / 2);
+  const top = Math.round((height - iconSize) / 2);
+
+  return png(width, height, (x, y) => {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+
+    for (let sy = 0; sy < samples; sy += 1) {
+      for (let sx = 0; sx < samples; sx += 1) {
+        const px = x + (sx + 0.5) / samples;
+        const py = y + (sy + 0.5) / samples;
+        const inside = px >= left && px < left + iconSize && py >= top && py < top + iconSize;
+
+        if (!inside) {
+          r += SURFACE[0];
+          g += SURFACE[1];
+          b += SURFACE[2];
+          continue;
+        }
+
+        const color = iconColor((px - left) / iconSize, (py - top) / iconSize, false);
+        // Внутри квадрата иконки прозрачных зон нет: углы закруглены фоном.
+        if (color[3] === 0) {
+          r += SURFACE[0];
+          g += SURFACE[1];
+          b += SURFACE[2];
+        } else {
+          r += color[0];
+          g += color[1];
+          b += color[2];
+        }
+      }
+    }
+
+    const count = samples * samples;
+    return [Math.round(r / count), Math.round(g / count), Math.round(b / count), 255];
+  });
+}
+
 mkdirSync(outDir, { recursive: true });
 
 const files = [
@@ -139,5 +185,22 @@ const files = [
 
 for (const [name, buffer] of files) {
   writeFileSync(resolve(outDir, name), buffer);
+  console.log(`${name} — ${buffer.length} bytes`);
+}
+
+const splashDir = resolve(root, 'apps/web/public/splash');
+mkdirSync(splashDir, { recursive: true });
+
+const splashes = [
+  [1170, 2532],
+  [1284, 2778],
+  [750, 1334],
+  [2048, 2732],
+];
+
+for (const [width, height] of splashes) {
+  const name = `splash-${width}x${height}.png`;
+  const buffer = renderSplash(width, height);
+  writeFileSync(resolve(splashDir, name), buffer);
   console.log(`${name} — ${buffer.length} bytes`);
 }

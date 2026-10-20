@@ -6,6 +6,7 @@ import type {
   DeclineBookingInput,
 } from '@staynest/shared';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { markInstallEligible } from '../../pwa';
 import {
   cancelBookingRequest,
   confirmBookingRequest,
@@ -60,6 +61,8 @@ export function useCreateBooking() {
       createBookingRequest(input, key),
     onSuccess: (booking) => {
       invalidate(booking);
+      // После успешной заявки установка PWA уместнее, чем на первом визите.
+      markInstallEligible();
     },
   });
 }

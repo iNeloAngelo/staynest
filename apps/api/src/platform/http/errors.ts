@@ -1,4 +1,5 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
+import { PRIVATE_CACHE_CONTROL } from './cache';
 
 type ProblemDetails = {
   type: string;
@@ -72,11 +73,15 @@ function sendProblem(reply: FastifyReply, input: ProblemInput): void {
     reply.header(name, value);
   }
 
-  void reply
-    .header('cache-control', 'no-store')
-    .status(input.status)
-    .type('application/problem+json')
-    .send(problem(input));
+  // Публичные маршруты ставят Cache-Control до валидации; ошибка не должна
+  // унаследовать public/immutable. Приватные ответы остаются private.
+  const existing = String(reply.getHeader('cache-control') ?? '');
+  void reply.header(
+    'cache-control',
+    existing.startsWith('private') ? PRIVATE_CACHE_CONTROL : 'no-store',
+  );
+
+  void reply.status(input.status).type('application/problem+json').send(problem(input));
 }
 
 function logServerError(request: FastifyRequest, error: FastifyError): void {

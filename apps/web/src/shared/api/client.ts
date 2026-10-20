@@ -10,6 +10,8 @@ type RequestOptions = {
   /** Повторять запрос после обновления сессии. Для /me и auth-эндпоинтов выключено. */
   authRetry?: boolean;
   headers?: HeadersInit;
+  /** Отмена запроса, например при logout/смене пользователя. */
+  signal?: AbortSignal;
 };
 
 function buildHeaders(init: RequestInit): Headers {
@@ -37,6 +39,7 @@ async function request<T>(
     response = await fetch(`${API_BASE}${path}`, {
       credentials: 'same-origin',
       ...init,
+      signal: options.signal,
       headers: buildHeaders({ ...init, headers: options.headers ?? init.headers }),
     });
   } catch {
