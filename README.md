@@ -48,15 +48,16 @@ pnpm dev                    # API :3100 и web :5173
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | TypeScript без emit |
 | `pnpm test` | Vitest во всех пакетах |
-| `pnpm e2e` | Playwright e2e (база готовится отдельно) |
+| `pnpm e2e` | Playwright e2e на dev-сервере (база готовится отдельно) |
+| `pnpm e2e:pwa` | PWA e2e на production-сборке: SW, офлайн-чтение, очистка кэшей |
 | `pnpm e2e:prepare` | Пересоздать `E2E_DATABASE_URL` (`_test`, loopback) и накатить миграции |
-
-E2E не трогает базу без явной подготовки: `E2E_DATABASE_URL=postgres://staynest:staynest@127.0.0.1:5433/staynest_e2e_test pnpm e2e:prepare`, затем `pnpm e2e`. Playwright сам поднимает API и web.
 | `pnpm depcheck` | Границы модулей (dependency-cruiser) |
 | `pnpm knip` | Мёртвый код и неиспользуемые зависимости |
 | `pnpm format` | Prettier |
 | `pnpm infra:up` / `infra:down` | Инфраструктура для разработки |
 | `pnpm peers check` | Проверка совместимости peer-зависимостей |
+
+E2E не трогает базу без явной подготовки: `E2E_DATABASE_URL=postgres://staynest:staynest@127.0.0.1:5433/staynest_e2e_test pnpm e2e:prepare`, затем `pnpm e2e` или `pnpm e2e:pwa`. Playwright сам поднимает API и web; для PWA-теста web собирается в production и запускается через `vite preview` на 4173.
 
 ## Структура
 

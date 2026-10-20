@@ -71,11 +71,12 @@ flowchart TD
 
 ```
 apps/web/src/
-├─ app/                   провайдеры, роутер, макет, ErrorBoundary, регистрация service worker
+├─ app/                   провайдеры, роутер, макет, lazyPages, ErrorBoundary, регистрация service worker
 ├─ pages/                 экраны уровня маршрута, ТОНКИЕ: собирают фичи
 │  ├─ home/  listing/  host-dashboard/  host-listings/  host-requests/  host-calendar/
-│  ├─ trips/  favorites/  profile/  login/  not-found/
+│  ├─ trips/  favorites/  profile/  login/  offline/  not-found/
 ├─ features/              законченные пользовательские блоки
+│  ├─ pwa/                service worker, офлайн-баннеры, установка, очистка кэшей
 │  └─ catalog/
 │     ├─ index.ts         публичный интерфейс фичи (компоненты и хуки, доступные снаружи)
 │     ├─ api/             запросы и хуки TanStack Query
