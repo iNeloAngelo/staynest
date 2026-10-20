@@ -4,9 +4,11 @@
 #
 # Сети разделены (Сессия 17):
 #   edge     — только Caddy: сюда приходят 80/443 из интернета;
-#   internal — API, worker, Postgres, Silo, Mailpit. Наружу не маршрутизируется.
-# API, Postgres, Silo и Mailpit не имеют публикации портов, кроме loopback
-# для отладки через SSH-туннель (5433) и просмотра писем (8025).
+#   internal — API, worker, Postgres, Silo, Mailpit. Наружу не маршрутизируется;
+#   ops      — только loopback-публикация Postgres (5433) и Mailpit UI (8025)
+#              для SSH-туннеля. Docker не публикует порты контейнеров, которые
+#              подключены только к internal-сети, поэтому нужна отдельная bridge-сеть.
+# API, Postgres, Silo и Mailpit не имеют публикации портов, кроме loopback.
 name: staynest
 
 x-logging: &logging
@@ -149,6 +151,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
     networks:
       - internal
+      - ops
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 5s
@@ -194,6 +197,7 @@ services:
       - '127.0.0.1:8025:8025'
     networks:
       - internal
+      - ops
     healthcheck:
       test: ['CMD-SHELL', 'wget -q --spider http://localhost:8025/livez || exit 1']
       interval: 30s
@@ -208,6 +212,7 @@ networks:
   edge:
   internal:
     internal: true
+  ops:
 
 volumes:
   postgres-data:
