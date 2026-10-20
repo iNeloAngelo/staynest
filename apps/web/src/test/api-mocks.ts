@@ -1,5 +1,7 @@
 import type {
   BlockDto,
+  BookingDetail,
+  BookingSummary,
   CalendarResponse,
   HostCalendarResponse,
   ListingDto,
@@ -138,6 +140,66 @@ export const demoPublicDetail: PublicListing = {
   amenities: demoAmenities,
 };
 
+export function demoBooking(status: BookingSummary['status'] = 'pending'): BookingSummary {
+  const checkIn = addDays(todayLocalIso(), 10);
+  const checkOut = addDays(checkIn, 2);
+
+  return {
+    id: 'a11f5f4b-0f77-4c4e-9f0a-6b1c2d3e4f55',
+    listingId: demoPublicListing.id,
+    guestId: demoUser.id,
+    status,
+    checkIn,
+    checkOut,
+    nights: 2,
+    guestsCount: 2,
+    totalMinor: 1_650_000,
+    currency: 'RUB',
+    priceBreakdown: demoQuote(`/quote?checkIn=${checkIn}&checkOut=${checkOut}&guests=2`),
+    guestMessage: 'Приедем к вечеру, с собакой.',
+    hostResponse: null,
+    expiresAt: addDays(todayLocalIso(), 1),
+    confirmedAt: null,
+    cancelledAt: null,
+    cancelledByRole: null,
+    cancelReason: null,
+    createdAt: '2026-10-19T10:00:00.000Z',
+    updatedAt: '2026-10-19T10:00:00.000Z',
+    listing: {
+      id: demoPublicListing.id,
+      title: demoPublicListing.title,
+      city: demoPublicListing.city,
+      coverPhotoUrl: demoPhoto.urls.thumb,
+    },
+    guest: { id: demoUser.id, displayName: demoUser.displayName },
+  };
+}
+
+export function demoBookingDetail(status: BookingSummary['status'] = 'pending'): BookingDetail {
+  const booking = demoBooking(status);
+  return {
+    ...booking,
+    contacts:
+      status === 'confirmed' || status === 'completed'
+        ? {
+            addressLine: 'улица Лесная, 12',
+            hostPhone: '+7 900 000-00-22',
+            guestPhone: null,
+          }
+        : null,
+    events: [
+      {
+        id: '1',
+        actorRole: 'guest',
+        fromStatus: null,
+        toStatus: 'pending',
+        note: null,
+        createdAt: booking.createdAt,
+      },
+    ],
+  };
+}
+
 export function demoCalendar(listingId = demoPublicListing.id): CalendarResponse {
   const today = todayLocalIso();
   return {
@@ -208,6 +270,10 @@ export type ApiMockOptions = {
   catalogDetail?: PublicListing | null;
   priceRules?: PriceRuleDto[];
   blocks?: BlockDto[];
+  bookings?: BookingSummary[];
+  bookingDetail?: BookingDetail;
+  bookingCreateStatus?: number;
+  bookingCreateBody?: unknown;
   pendingHostCalendar?: boolean;
   publishStatus?: number;
   publishBody?: unknown;
@@ -372,9 +438,97 @@ function listingsRoute(ctx: RouteContext): Response | null {
   return null;
 }
 
-function route(ctx: RouteContext): Response {
+function bookingStatusAfter(
+  action: string,
+  current: BookingDetail['status'],
+): BookingDetail['status'] {
+  if (action === 'confirm') return 'confirmed';
+  if (action === 'decline') return 'declined';
+  return current === 'confirmed' ? 'cancelled_by_host' : 'cancelled_by_guest';
+}
+
+function bookingActionRoute(
+  url: string,
+  action: string,
+  details: Map<string, BookingDetail>,
+): Response {
+  const id = url.split('/bookings/')[1]?.split('/')[0] ?? '';
+  const current = details.get(id) ?? demoBookingDetail();
+  const next: BookingDetail = {
+    ...current,
+    status: bookingStatusAfter(action, current.status),
+    updatedAt: '2026-10-19T11:00:00.000Z',
+    events: [
+      ...current.events,
+      {
+        id: String(current.events.length + 1),
+        actorRole: 'host',
+        fromStatus: current.status,
+        toStatus: bookingStatusAfter(action, current.status),
+        note: null,
+        createdAt: '2026-10-19T11:00:00.000Z',
+      },
+    ],
+  };
+  details.set(next.id, next);
+  return jsonResponse({ booking: next });
+}
+
+function bookingCreateRoute(
+  ctx: RouteContext,
+  details: Map<string, BookingDetail>,
+): Response | null {
+  const { url, method, options } = ctx;
+  if (method !== 'POST' || !url.endsWith('/bookings')) return null;
+
+  if (options.bookingCreateStatus && options.bookingCreateStatus >= 400) {
+    return jsonResponse(
+      options.bookingCreateBody ?? { code: 'booking_dates_unavailable' },
+      options.bookingCreateStatus,
+    );
+  }
+
+  const detail = options.bookingDetail ?? demoBookingDetail();
+  details.set(detail.id, detail);
+  return jsonResponse({ booking: detail }, 201);
+}
+
+function bookingDetailRoute(
+  ctx: RouteContext,
+  details: Map<string, BookingDetail>,
+): Response | null {
+  const match = /\/bookings\/([^/?]+)$/.exec(ctx.url);
+  if (ctx.method !== 'GET' || !match?.[1]) return null;
+
+  const detail = details.get(match[1]) ?? ctx.options.bookingDetail ?? demoBookingDetail();
+  return jsonResponse({ booking: detail });
+}
+
+function bookingsRoute(ctx: RouteContext, details: Map<string, BookingDetail>): Response | null {
+  const { url, method, options } = ctx;
+
+  if (url.includes('/me/bookings')) {
+    return jsonResponse({
+      bookings: options.bookings ?? [...details.values()],
+      nextCursor: null,
+    });
+  }
+
+  const create = bookingCreateRoute(ctx, details);
+  if (create) return create;
+
+  const action = method === 'POST' ? /\/(confirm|decline|cancel)$/.exec(url)?.[1] : undefined;
+  if (action) return bookingActionRoute(url, action, details);
+
+  return bookingDetailRoute(ctx, details);
+}
+
+function route(ctx: RouteContext, details: Map<string, BookingDetail>): Response {
   const auth = authRoute(ctx);
   if (auth) return auth;
+
+  const booking = bookingsRoute(ctx, details);
+  if (booking) return booking;
 
   const listing = listingsRoute(ctx);
   if (listing) return listing;
@@ -389,13 +543,19 @@ function route(ctx: RouteContext): Response {
  */
 export function mockApi(options: ApiMockOptions = {}): ReturnType<typeof vi.fn> {
   const store = [...(options.listings ?? [])];
+  const details = new Map<string, BookingDetail>();
+  for (const booking of options.bookings ?? []) {
+    details.set(booking.id, { ...demoBookingDetail(booking.status), ...booking });
+  }
+  if (options.bookingDetail) details.set(options.bookingDetail.id, options.bookingDetail);
+
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     options.onRequest?.(String(input), init);
     if (options.pendingHostCalendar && String(input).includes('/calendar/host')) {
       return new Promise<Response>(() => undefined);
     }
     const method = (init?.method ?? 'GET').toUpperCase();
-    return Promise.resolve(route({ url: String(input), method, init, store, options }));
+    return Promise.resolve(route({ url: String(input), method, init, store, options }, details));
   });
 
   vi.stubGlobal('fetch', fetchMock);

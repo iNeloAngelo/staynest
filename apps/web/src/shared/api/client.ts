@@ -28,6 +28,7 @@ const API_BASE = '/api/v1';
 type RequestOptions = {
   /** Повторять запрос после обновления сессии. Для /me и auth-эндпоинтов выключено. */
   authRetry?: boolean;
+  headers?: HeadersInit;
 };
 
 const STATUS_CODES: Record<number, string> = {
@@ -149,7 +150,7 @@ async function request<T>(
     response = await fetch(`${API_BASE}${path}`, {
       credentials: 'same-origin',
       ...init,
-      headers: buildHeaders(init),
+      headers: buildHeaders({ ...init, headers: options.headers ?? init.headers }),
     });
   } catch {
     throw new ApiError(0, 'network_error', 'Нет связи с сервером.');
@@ -160,7 +161,7 @@ async function request<T>(
     const outcome = await refreshSession();
 
     if (outcome.kind === 'ok') {
-      return request<T>(path, init, { authRetry: false });
+      return request<T>(path, init, { ...options, authRetry: false });
     }
 
     // 5xx/сеть при refresh — это не «гость», а сбой: пусть useMe покажет ошибку.

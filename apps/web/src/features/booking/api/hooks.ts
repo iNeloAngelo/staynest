@@ -1,12 +1,7 @@
 import type { CalendarResponse, Quote } from '@staynest/shared';
 import { useQuery } from '@tanstack/react-query';
 import { fetchListingCalendar, fetchQuote } from './booking';
-
-const bookingKeys = {
-  calendar: (id: string) => ['booking', 'calendar', id] as const,
-  quote: (id: string, checkIn: string, checkOut: string, guests: number) =>
-    ['booking', 'quote', id, checkIn, checkOut, guests] as const,
-};
+import { bookingKeys } from './bookings-hooks';
 
 const CALENDAR_STALE_TIME_MS = 30_000;
 

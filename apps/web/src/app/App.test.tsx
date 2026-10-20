@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +9,8 @@ import { formatLongDate, todayLocalIso } from '../shared/lib/dates';
 import { ToastProvider } from '../shared/ui';
 import {
   completeListing,
+  demoBooking,
+  demoBookingDetail,
   demoListing,
   demoPublicListing,
   demoUser,
@@ -565,5 +567,131 @@ describe('App', () => {
       reason: 'Ремонт',
     });
     expect(await screen.findByText('Даты заблокированы')).toBeInTheDocument();
+  });
+
+  it('отправляет заявку с ключом идемпотентности и открывает экран результата', async () => {
+    const requests: Array<{ key: string | null; body: Record<string, unknown> }> = [];
+    const detail = demoBookingDetail('pending');
+    mockApi({
+      user: demoUser,
+      bookingDetail: detail,
+      onRequest: (url, init) => {
+        if (url.endsWith('/bookings') && init?.method === 'POST') {
+          requests.push({
+            key: new Headers(init.headers).get('idempotency-key'),
+            body: JSON.parse(String(init.body)) as Record<string, unknown>,
+          });
+        }
+      },
+    });
+    const user = userEvent.setup();
+    renderApp([`/listings/${demoPublicListing.id}`]);
+
+    await screen.findByRole('heading', { name: 'Даты и стоимость' });
+    const checkIn = addDays(todayLocalIso(), 1);
+    const checkOut = addDays(todayLocalIso(), 3);
+    await user.click(findDayButton(checkIn));
+    await user.click(findDayButton(checkOut));
+    await screen.findByText('Итого');
+
+    await user.type(screen.getByLabelText('Сообщение хозяину'), 'Приедем вечером');
+    await user.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+
+    expect(await screen.findByRole('heading', { name: 'Заявка отправлена' })).toBeInTheDocument();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.key).toMatch(/[0-9a-f-]{20,}/);
+    expect(requests[0]?.body).toMatchObject({
+      listingId: demoPublicListing.id,
+      checkIn,
+      checkOut,
+      guestsCount: 1,
+      guestMessage: 'Приедем вечером',
+    });
+  });
+
+  it('объясняет конфликт дат и перезапрашивает календарь', async () => {
+    let calendarRequests = 0;
+    mockApi({
+      user: demoUser,
+      bookingCreateStatus: 409,
+      bookingCreateBody: {
+        type: 'about:blank',
+        title: 'Conflict',
+        status: 409,
+        code: 'booking_dates_unavailable',
+      },
+      onRequest: (url) => {
+        if (url.includes('/calendar?')) calendarRequests += 1;
+      },
+    });
+    const user = userEvent.setup();
+    renderApp([`/listings/${demoPublicListing.id}`]);
+
+    await screen.findByRole('heading', { name: 'Даты и стоимость' });
+    const checkIn = addDays(todayLocalIso(), 1);
+    const checkOut = addDays(todayLocalIso(), 3);
+    await user.click(findDayButton(checkIn));
+    await user.click(findDayButton(checkOut));
+    await screen.findByText('Итого');
+    const before = calendarRequests;
+
+    await user.click(screen.getByRole('button', { name: 'Отправить заявку' }));
+
+    expect(await screen.findByText(/Эти даты только что заняли/)).toBeInTheDocument();
+    await waitFor(() => expect(calendarRequests).toBeGreaterThan(before));
+    expect(screen.getAllByRole('button', { name: 'Сбросить даты' }).length).toBeGreaterThan(0);
+  });
+
+  it('показывает поездки по вкладкам и отменяет заявку', async () => {
+    const pending = { ...demoBooking('pending'), id: '11111111-1111-4111-8111-111111111111' };
+    const confirmed = { ...demoBooking('confirmed'), id: '22222222-2222-4222-8222-222222222222' };
+    const declined = { ...demoBooking('declined'), id: '33333333-3333-4333-8333-333333333333' };
+    mockApi({ user: demoUser, bookings: [pending, confirmed, declined] });
+    const user = userEvent.setup();
+    renderApp(['/trips']);
+
+    expect(await screen.findByRole('heading', { name: 'Мои поездки' })).toBeInTheDocument();
+    expect(await screen.findByText('Ожидает ответа')).toBeInTheDocument();
+    expect(screen.getByText('Подтверждено')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /Отменённые/ }));
+    expect(await screen.findByText('Отклонено')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /Предстоящие/ }));
+    await user.click(screen.getAllByRole('button', { name: 'Отменить заявку' })[0]!);
+    const dialog = await screen.findByRole('dialog', { name: 'Отменить заявку?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Отменить заявку' }));
+
+    expect(await screen.findByText('Бронь отменена')).toBeInTheDocument();
+  });
+
+  it('подтверждает входящую заявку хозяина', async () => {
+    mockApi({ user: demoUser, bookings: [demoBooking('pending')] });
+    const user = userEvent.setup();
+    renderApp(['/host/requests']);
+
+    expect(await screen.findByRole('heading', { name: 'Входящие заявки' })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Подтвердить' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Подтвердить заявку?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Подтвердить' }));
+
+    expect(await screen.findByText('Заявка подтверждена')).toBeInTheDocument();
+  });
+
+  it('показывает статус, таймлайн и контакты подтверждённой брони', async () => {
+    const confirmed = demoBookingDetail('confirmed');
+    mockApi({ user: demoUser, bookingDetail: confirmed });
+    renderApp([`/bookings/${confirmed.id}`]);
+
+    expect(await screen.findByRole('heading', { name: 'Дом у озера' })).toBeInTheDocument();
+    expect(screen.getAllByText('Подтверждено').length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: 'Контакты' })).toBeInTheDocument();
+    expect(screen.getByText('улица Лесная, 12')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '+7 900 000-00-22' })).toHaveAttribute(
+      'href',
+      'tel:+79000000022',
+    );
+    expect(screen.getByRole('heading', { name: 'История брони' })).toBeInTheDocument();
   });
 });

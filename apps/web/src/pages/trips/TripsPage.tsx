@@ -1,13 +1,5 @@
-import { Luggage } from 'lucide-react';
-import { PlaceholderPage } from '../placeholder/PlaceholderPage';
+import { TripsView } from '../../features/booking';
 
 export function TripsPage() {
-  return (
-    <PlaceholderPage
-      icon={Luggage}
-      titleKey="pages.trips.title"
-      emptyTitleKey="pages.trips.emptyTitle"
-      emptyBodyKey="pages.trips.emptyBody"
-    />
-  );
+  return <TripsView />;
 }

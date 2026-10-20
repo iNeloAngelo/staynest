@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { FavoritesPage } from '../pages/favorites/FavoritesPage';
 import { ForgotPasswordPage } from '../pages/forgot-password/ForgotPasswordPage';
+import { BookingPage } from '../pages/booking/BookingPage';
 import { HostListingsPage } from '../pages/host-listings/HostListingsPage';
 import { HostRequestsPage } from '../pages/host-requests/HostRequestsPage';
 import { LoginPage } from '../pages/login/LoginPage';
@@ -56,6 +57,7 @@ export function App() {
             <Route element={<RequireAuth />}>
               <Route path="profile" element={<ProfilePage />} />
               <Route path="trips" element={<TripsPage />} />
+              <Route path="bookings/:id" element={<BookingPage />} />
               <Route path="favorites" element={<FavoritesPage />} />
               <Route path="host/listings" element={<HostListingsPage />} />
               <Route path="host/listings/:id" element={<ListingEditorPage />} />

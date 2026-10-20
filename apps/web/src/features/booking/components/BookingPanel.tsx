@@ -1,97 +1,16 @@
+import { BOOKING_MESSAGE_MAX } from '@staynest/shared';
 import type { PublicListing } from '@staynest/shared';
-import type { TFunction } from 'i18next';
-import type { DateRange } from 'react-day-picker';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TranslationKey } from '../../../shared/i18n';
-import { formatIsoDateLocal, formatLongDate, parseIsoDateLocal } from '../../../shared/lib/dates';
+import { formatLongDate } from '../../../shared/lib/dates';
 import { Button } from '../../../shared/ui/Button';
 import { NumberStepper } from '../../../shared/ui/NumberStepper';
 import { Skeleton } from '../../../shared/ui/Skeleton';
-import { useListingCalendar, useQuote } from '../api/hooks';
-import {
-  rangeIsQuoteable,
-  rangeNights,
-  rangeProblem,
-  selectRange,
-  unavailableSet,
-} from '../model/selection';
-import type { IsoRange, RangeNotice } from '../model/selection';
+import { Textarea } from '../../../shared/ui/Textarea';
+import { useBookingRequest } from '../model/useBookingRequest';
+import { toDayPickerRange, useBookingSelection } from '../model/useBookingSelection';
+import type { IsoRange } from '../model/selection';
 import { BookingCalendar } from './BookingCalendar';
 import { QuoteSummary } from './QuoteSummary';
-
-const NOTICE_KEYS: Record<RangeNotice, TranslationKey> = {
-  busy_start: 'booking.notice.busyStart',
-  range_blocked: 'booking.notice.rangeBlocked',
-  past: 'booking.notice.past',
-};
-
-function toDayPickerRange(range: IsoRange | undefined): DateRange | undefined {
-  if (!range?.from) return undefined;
-  return {
-    from: parseIsoDateLocal(range.from),
-    to: range.to ? parseIsoDateLocal(range.to) : undefined,
-  };
-}
-
-function noticeText(
-  notice: RangeNotice | null,
-  range: IsoRange | undefined,
-  calendar: { minNights: number; maxNights: number } | undefined,
-  t: TFunction,
-): string | null {
-  if (notice) return t(NOTICE_KEYS[notice]);
-  const problem = rangeProblem(range, calendar);
-  if (problem === 'incomplete') {
-    return range?.from ? t('booking.selectCheckOut') : t('booking.selectCheckIn');
-  }
-  if (problem === 'min_nights') return t('booking.minNightsHint', { count: calendar?.minNights });
-  if (problem === 'max_nights') return t('booking.maxNightsHint', { count: calendar?.maxNights });
-  return null;
-}
-
-function useBookingSelection(listing: PublicListing) {
-  const { t } = useTranslation();
-  const [range, setRange] = useState<IsoRange | undefined>();
-  const [guests, setGuests] = useState(1);
-  const [notice, setNotice] = useState<RangeNotice | null>(null);
-  const calendarQuery = useListingCalendar(listing.id);
-  const calendar = calendarQuery.data;
-  const quote = useQuote({
-    listingId: listing.id,
-    checkIn: range?.from ?? null,
-    checkOut: range?.to ?? null,
-    guests,
-    enabled: rangeIsQuoteable(range, calendar),
-  });
-
-  function handleSelect(date: Date): void {
-    const result = selectRange(range, formatIsoDateLocal(date), {
-      unavailable: unavailableSet(calendar),
-      today: calendar?.today ?? formatIsoDateLocal(date),
-    });
-    setRange(result.range);
-    setNotice(result.notice);
-  }
-
-  function reset(): void {
-    setRange(undefined);
-    setNotice(null);
-  }
-
-  return {
-    calendarQuery,
-    calendar,
-    range,
-    guests,
-    setGuests,
-    quote,
-    handleSelect,
-    reset,
-    hint: noticeText(notice, range, calendar, t),
-    nights: rangeNights(range),
-  };
-}
 
 function SelectedDates({ range, language }: { range: IsoRange | undefined; language: string }) {
   const { t } = useTranslation();
@@ -144,18 +63,18 @@ function BookingError({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function BookingCta() {
+function HowItWorks() {
   const { t } = useTranslation();
 
   return (
-    <div>
-      <Button fullWidth size="lg" disabled aria-describedby="booking-coming-soon">
-        {t('booking.book')}
-      </Button>
-      <p id="booking-coming-soon" className="mt-2 text-center text-caption text-ink-muted">
-        {t('booking.bookingSoon')}
-      </p>
-    </div>
+    <section className="rounded-md bg-surface-2 p-3">
+      <h3 className="text-small font-semibold text-ink">{t('booking.how.title')}</h3>
+      <ol className="mt-2 flex list-decimal flex-col gap-1 pl-5 text-small text-ink-muted">
+        <li>{t('booking.how.request')}</li>
+        <li>{t('booking.how.reply')}</li>
+        <li>{t('booking.how.reserved')}</li>
+      </ol>
+    </section>
   );
 }
 
@@ -189,51 +108,40 @@ function BookingHeader({
   );
 }
 
-export function BookingPanel({
+type Selection = ReturnType<typeof useBookingSelection>;
+type Request = ReturnType<typeof useBookingRequest>;
+
+function BookingDatesSection({
   listing,
-  heading = true,
+  selection,
+  heading,
 }: {
   listing: PublicListing;
-  heading?: boolean;
+  selection: Selection;
+  heading: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  const selection = useBookingSelection(listing);
-  const { calendarQuery, calendar, range, guests, setGuests, quote, handleSelect, hint, nights } =
-    selection;
-
-  if (calendarQuery.isPending) {
-    return (
-      <div className="flex flex-col gap-3" aria-busy="true">
-        <Skeleton className="h-6 w-1/2" />
-        <Skeleton className="h-72 w-full rounded-lg" />
-        <Skeleton className="h-16 w-full rounded-md" />
-      </div>
-    );
-  }
-
-  if (calendarQuery.isError || !calendar) {
-    return <BookingError onRetry={() => void calendarQuery.refetch()} />;
-  }
+  const { calendar, range, guests, setGuests, quote, hint } = selection;
+  if (!calendar) return null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       <BookingHeader
         heading={heading}
         minNights={calendar.minNights}
         hasRange={Boolean(range?.from)}
         onReset={selection.reset}
       />
-
       <SelectedDates range={range} language={i18n.language} />
       <BookingCalendar
         calendar={calendar}
         selected={toDayPickerRange(range)}
-        onSelect={handleSelect}
+        onSelect={selection.handleSelect}
       />
       <CalendarLegend />
 
       <p role="status" aria-live="polite" className="min-h-5 text-small text-ink-muted">
-        {hint ?? (nights > 0 ? t('booking.nights', { count: nights }) : '')}
+        {hint ?? (selection.nights > 0 ? t('booking.nights', { count: selection.nights }) : '')}
       </p>
 
       <NumberStepper
@@ -246,7 +154,122 @@ export function BookingPanel({
       />
 
       <QuoteSummary quote={quote.data} loading={quote.isFetching} error={quote.error} />
-      <BookingCta />
+    </>
+  );
+}
+
+function BookingSubmitSection({
+  selection,
+  request,
+  canSubmit,
+}: {
+  selection: Selection;
+  request: Request;
+  canSubmit: boolean;
+}) {
+  const { t } = useTranslation();
+  const { message, setMessage } = selection;
+
+  return (
+    <>
+      <Textarea
+        label={t('booking.message.label')}
+        hint={t('booking.message.hint')}
+        value={message}
+        maxLength={BOOKING_MESSAGE_MAX}
+        currentLength={message.length}
+        showCounter
+        onChange={(event) => {
+          setMessage(event.target.value);
+          request.clearError();
+        }}
+      />
+      <HowItWorks />
+
+      {request.error ? (
+        <div
+          role="alert"
+          className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-small text-danger"
+        >
+          <p>{request.error}</p>
+          {request.conflict ? (
+            <Button variant="secondary" className="mt-2" onClick={selection.reset}>
+              {t('booking.clear')}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <Button
+        fullWidth
+        size="lg"
+        loading={request.pending}
+        disabled={!canSubmit}
+        onClick={request.submit}
+      >
+        {request.authenticated ? t('booking.submit') : t('booking.submitAnon')}
+      </Button>
+    </>
+  );
+}
+
+function BookingPanelBody({
+  listing,
+  selection,
+  request,
+  heading,
+}: {
+  listing: PublicListing;
+  selection: Selection;
+  request: Request;
+  heading: boolean;
+}) {
+  const canSubmit = Boolean(selection.quote.data) && !selection.quote.isFetching && request.online;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <BookingDatesSection listing={listing} selection={selection} heading={heading} />
+      <BookingSubmitSection selection={selection} request={request} canSubmit={canSubmit} />
     </div>
+  );
+}
+
+export function BookingPanel({
+  listing,
+  heading = true,
+}: {
+  listing: PublicListing;
+  heading?: boolean;
+}) {
+  const selection = useBookingSelection(listing);
+  const { calendarQuery } = selection;
+  const request = useBookingRequest({
+    listingId: listing.id,
+    range: selection.range,
+    guests: selection.guests,
+    message: selection.message,
+    ready: Boolean(selection.quote.data),
+    onDatesUnavailable: () => {
+      void calendarQuery.refetch();
+      void selection.quote.refetch();
+    },
+  });
+
+  if (calendarQuery.isPending) {
+    return (
+      <div className="flex flex-col gap-3" aria-busy="true">
+        <Skeleton className="h-6 w-1/2" />
+        <Skeleton className="h-72 w-full rounded-lg" />
+        <Skeleton className="h-16 w-full rounded-md" />
+      </div>
+    );
+  }
+
+  if (calendarQuery.isError || !selection.calendar) {
+    return <BookingError onRetry={() => void calendarQuery.refetch()} />;
+  }
+
+  return (
+    <BookingPanelBody listing={listing} selection={selection} request={request} heading={heading} />
   );
 }
