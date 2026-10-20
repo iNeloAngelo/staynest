@@ -57,6 +57,23 @@ echo "deployed: $DEPLOYED_SHA (previous: $PREVIOUS_SHA)"
 
 if [[ "${SKIP_PRE_DEPLOY_BACKUP:-0}" != "1" ]]; then
   echo "== pre-deploy backup =="
+  PG_ID="$("${COMPOSE[@]}" ps -q postgres)"
+  status=$(docker inspect --format '{{.State.Health.Status}}' "$PG_ID" 2>/dev/null || echo missing)
+  if [[ "$status" != "healthy" ]]; then
+    echo "Postgres не healthy ($status): поднимаю перед бэкапом"
+    "${COMPOSE[@]}" down --remove-orphans || true
+    "${COMPOSE[@]}" up -d postgres
+    for _ in $(seq 1 40); do
+      PG_ID="$("${COMPOSE[@]}" ps -q postgres)"
+      status=$(docker inspect --format '{{.State.Health.Status}}' "$PG_ID" 2>/dev/null || echo starting)
+      if [[ "$status" == "healthy" ]]; then break; fi
+      sleep 2
+    done
+    if [[ "$status" != "healthy" ]]; then
+      echo "Postgres не стал healthy перед бэкапом" >&2
+      exit 1
+    fi
+  fi
   if ! ./scripts/prod-backup.sh; then
     echo "Бэкап перед деплоем не удался — выкатка остановлена." >&2
     exit 1

@@ -70,4 +70,4 @@ Get-ChildItem $Destination -Directory |
   ForEach-Object { Remove-Item -Recurse -Force $_.FullName; Write-Host "Удалена старая копия $($_.Name)" }
 
 Write-Host "Offsite-копия готова: $Destination"
-Write-Host "Расшифровка: tools\age\age\age.exe -d -i age-identity.txt -o staynest.dump <stamp>\staynest-<stamp>.dump.age"
+Write-Host ('Расшифровка: tools\age\age\age.exe -d -i age-identity.txt -o staynest.dump ' + $stamp + '\staynest-' + $stamp + '.dump.age')
