@@ -27,8 +27,21 @@ PWA для аренды домов: хозяин создаёт объявлен
 cp .env.example .env        # Windows PowerShell: Copy-Item .env.example .env
 pnpm install
 pnpm infra:up               # Postgres, Silo (S3), Mailpit (нужен локальный Docker)
+pnpm db:reset               # схема + справочник удобств
+pnpm seed:demo              # 14 домов, фото, брони и два демо-аккаунта
 pnpm dev                    # API :3100 и web :5173
 ```
+
+Демо-аккаунты после `pnpm seed:demo`:
+
+| Роль | Email | Пароль |
+|---|---|---|
+| Хозяин | `host@staynest.demo` | `StayNest-Demo-2026` |
+| Гость | `guest@staynest.demo` | `StayNest-Demo-2026` |
+
+Фото демо-домов взяты с StockSnap.io под CC0 1.0, источники перечислены в
+`docs/credits.md`. Сид идемпотентен: повторный запуск заменяет только
+демо-аккаунты (`host@staynest.demo`, `guest@staynest.demo`) и их данные.
 
 Проверка:
 
@@ -51,6 +64,10 @@ pnpm dev                    # API :3100 и web :5173
 | `pnpm e2e` | Playwright e2e на dev-сервере (база готовится отдельно) |
 | `pnpm e2e:pwa` | PWA e2e на production-сборке: SW, офлайн-чтение, очистка кэшей |
 | `pnpm e2e:prepare` | Пересоздать `E2E_DATABASE_URL` (`_test`, loopback) и накатить миграции |
+| `pnpm seed:demo` | Демо-данные: 14 домов, 13 броней, фото, два аккаунта |
+| `pnpm seed:demo:clean` | Удалить демо-данные и их фото из S3 |
+| `pnpm seed:perf` | 10 000 объявлений и 100 000 броней для замеров |
+| `pnpm og:generate` | Пересобрать Open Graph-обложку из демо-фото |
 | `pnpm depcheck` | Границы модулей (dependency-cruiser) |
 | `pnpm knip` | Мёртвый код и неиспользуемые зависимости |
 | `pnpm format` | Prettier |
