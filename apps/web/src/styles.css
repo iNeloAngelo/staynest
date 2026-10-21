@@ -148,6 +148,8 @@
   --duration-panel: 200ms;
   --duration-sheet: 300ms;
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  /* Высота нижней навигации: один источник правды для nav, отступа страниц и липких панелей. */
+  --sn-nav: 4rem;
 }
 
 @layer base {
@@ -221,12 +223,13 @@
 }
 
 @utility pb-nav {
-  padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  /* 1px — верхняя граница навигации; 1.5rem — воздух между контентом и панелью. */
+  padding-bottom: calc(var(--sn-nav) + 1px + 1.5rem + env(safe-area-inset-bottom));
 }
 
 /* Липкая панель мастера должна оставаться над нижней навигацией. */
 @utility bottom-nav {
-  bottom: calc(56px + env(safe-area-inset-bottom));
+  bottom: calc(var(--sn-nav) + 1px + env(safe-area-inset-bottom));
 }
 
 @utility z-toast {

@@ -112,23 +112,25 @@ function GuestField({ filters, onChange }: CatalogSearchBarProps) {
   const { t } = useTranslation();
 
   return (
-    <Select
-      label={t('catalog.search.guests')}
-      value={filters.guests ?? ''}
-      onChange={(event) =>
-        onChange({
-          ...filters,
-          guests: event.target.value ? Number(event.target.value) : null,
-        })
-      }
-      options={[
-        { value: '', label: t('catalog.search.anyGuests') },
-        ...GUEST_OPTIONS.map((count) => ({
-          value: String(count),
-          label: t('catalog.search.guestOption', { count }),
-        })),
-      ]}
-    />
+    <div className="col-span-2 lg:col-span-1">
+      <Select
+        label={t('catalog.search.guests')}
+        value={filters.guests ?? ''}
+        onChange={(event) =>
+          onChange({
+            ...filters,
+            guests: event.target.value ? Number(event.target.value) : null,
+          })
+        }
+        options={[
+          { value: '', label: t('catalog.search.anyGuests') },
+          ...GUEST_OPTIONS.map((count) => ({
+            value: String(count),
+            label: t('catalog.search.guestOption', { count }),
+          })),
+        ]}
+      />
+    </div>
   );
 }
 

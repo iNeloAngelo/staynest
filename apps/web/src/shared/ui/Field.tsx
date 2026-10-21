@@ -18,7 +18,7 @@ export function FieldShell({ id, label, hint, error, counter, children }: FieldS
   const invalid = Boolean(error);
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <label htmlFor={id} className="text-small font-medium text-ink">
         {label}
       </label>
@@ -51,7 +51,7 @@ export function FieldShell({ id, label, hint, error, counter, children }: FieldS
 
 export function fieldClassName({ invalid, extra }: { invalid: boolean; extra?: string }): string {
   return cn(
-    'w-full rounded-md border bg-surface px-3 text-body text-ink',
+    'w-full min-w-0 rounded-md border bg-surface px-3 text-body text-ink',
     'transition-colors duration-micro placeholder:text-ink-muted',
     'hover:border-ink-muted',
     'disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-muted',

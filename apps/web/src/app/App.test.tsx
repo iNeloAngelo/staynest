@@ -232,6 +232,17 @@ describe('App', () => {
     expect(screen.getAllByRole('link', { name: 'Объявления' }).length).toBeGreaterThan(0);
   });
 
+  it('уводит вошедшего хозяина с витрины «Я сдаю» в сводку', async () => {
+    mockApi({ user: demoUser });
+    window.localStorage.setItem('staynest.mode', 'host');
+    renderApp(['/']);
+
+    expect(await screen.findByRole('heading', { name: 'Сводка', level: 1 })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /ваш дом может больше/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it('редиректит гостя с защищённого маршрута на вход', async () => {
     mockApi();
     renderApp(['/profile']);

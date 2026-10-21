@@ -1,11 +1,16 @@
 import { House } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useMe } from '../../features/auth';
 import { CatalogView } from '../../features/catalog/components/CatalogView';
 import { useMode } from '../../features/mode-switch';
 import { useSeo } from '../../shared/lib/seo';
-import { EmptyState, buttonClassName } from '../../shared/ui';
+import { EmptyState, Skeleton, buttonClassName } from '../../shared/ui';
 
+/**
+ * Витрина режима «Я сдаю» для гостя. Вошедшего хозяина отсюда уводим в «Сводку»:
+ * это его рабочий экран, и нижняя навигация подсвечивает пункт правильно.
+ */
 function HostHome() {
   const { t } = useTranslation();
 
@@ -40,6 +45,7 @@ function HostHome() {
 export function HomePage() {
   const { mode } = useMode();
   const { t } = useTranslation();
+  const { data: user, isPending } = useMe();
 
   useSeo({
     title: t(mode === 'host' ? 'seo.hostHome.title' : 'seo.home.title'),
@@ -47,5 +53,11 @@ export function HomePage() {
     image: '/og-image.jpg',
   });
 
-  return mode === 'host' ? <HostHome /> : <CatalogView />;
+  if (mode === 'host') {
+    if (isPending) return <Skeleton className="h-40 w-full rounded-lg" />;
+    if (user) return <Navigate to="/host" replace />;
+    return <HostHome />;
+  }
+
+  return <CatalogView />;
 }

@@ -26,7 +26,7 @@ export function BottomNav({ items, label, inline = false }: BottomNavProps) {
         inline ? 'rounded-lg' : 'fixed inset-x-0 bottom-0 z-40 pb-safe lg:hidden',
       )}
     >
-      <ul className="mx-auto grid max-w-page grid-cols-4">
+      <ul className="mx-auto grid h-16 max-w-page grid-cols-4">
         {items.map((item) => {
           const Icon = item.icon;
 
@@ -37,7 +37,7 @@ export function BottomNav({ items, label, inline = false }: BottomNavProps) {
                 end={item.end}
                 className={({ isActive }) =>
                   cn(
-                    'flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-small',
+                    'flex h-full flex-col items-center justify-center gap-0.5 px-1 text-small',
                     'transition-colors duration-micro',
                     isActive ? 'font-semibold text-primary' : 'text-ink-muted hover:text-ink',
                   )

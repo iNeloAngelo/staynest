@@ -89,9 +89,9 @@ export const en = {
   'home.host.title': 'Your home can do more',
   'home.host.subtitle':
     'A calendar without double bookings, requests with a clear reply window and calm price control.',
-  'home.host.cardTitle': 'Your listings will live here',
+  'home.host.cardTitle': 'Create your first listing',
   'home.host.cardBody':
-    'Soon you will add a home, photos and prices, and open dates will be calculated automatically.',
+    'Sign in or create an account to add your home, photos and prices. Open dates are calculated automatically.',
   'home.host.action': 'My listings',
 
   'auth.login.title': 'Welcome back',
