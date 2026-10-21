@@ -89,21 +89,25 @@ function DateFields({
 
   return (
     <>
-      <Input
-        label={t('catalog.search.checkIn')}
-        type="date"
-        value={checkIn}
-        max={checkOut || undefined}
-        onChange={(event) => onCheckInChange(event.target.value)}
-      />
-      <Input
-        label={t('catalog.search.checkOut')}
-        type="date"
-        value={checkOut}
-        min={checkIn ? addDays(checkIn, 1) : undefined}
-        error={error}
-        onChange={(event) => onCheckOutChange(event.target.value)}
-      />
+      <div className="col-span-2 sm:col-span-1">
+        <Input
+          label={t('catalog.search.checkIn')}
+          type="date"
+          value={checkIn}
+          max={checkOut || undefined}
+          onChange={(event) => onCheckInChange(event.target.value)}
+        />
+      </div>
+      <div className="col-span-2 sm:col-span-1">
+        <Input
+          label={t('catalog.search.checkOut')}
+          type="date"
+          value={checkOut}
+          min={checkIn ? addDays(checkIn, 1) : undefined}
+          error={error}
+          onChange={(event) => onCheckOutChange(event.target.value)}
+        />
+      </div>
     </>
   );
 }

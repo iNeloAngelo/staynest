@@ -202,6 +202,41 @@
   }
 }
 
+/*
+ * iOS Safari считает ширину нативных date/time-полей по своему контролу и
+ * игнорирует width: 100%: в сетке поле вылезает на соседнюю колонку.
+ * Правило включается только в WebKit на iOS (-webkit-touch-callout есть
+ * только там), поэтому в Chrome/Android остаётся штатная календарная иконка.
+ * Выбор даты по тапу сохраняется: это всё тот же <input type="date">.
+ */
+@supports (-webkit-touch-callout: none) {
+  @layer base {
+    input[type='date'],
+    input[type='time'],
+    input[type='datetime-local'],
+    input[type='month'],
+    input[type='week'] {
+      display: block;
+      box-sizing: border-box;
+      inline-size: 100%;
+      min-inline-size: 0;
+      max-inline-size: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+      line-height: 1.25;
+      overflow: hidden;
+    }
+
+    input[type='date']::-webkit-datetime-edit,
+    input[type='time']::-webkit-datetime-edit,
+    input[type='datetime-local']::-webkit-datetime-edit,
+    input[type='month']::-webkit-datetime-edit,
+    input[type='week']::-webkit-datetime-edit {
+      padding: 0;
+    }
+  }
+}
+
 @utility duration-micro {
   transition-duration: var(--duration-micro);
 }

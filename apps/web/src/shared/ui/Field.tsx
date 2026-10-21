@@ -51,7 +51,7 @@ export function FieldShell({ id, label, hint, error, counter, children }: FieldS
 
 export function fieldClassName({ invalid, extra }: { invalid: boolean; extra?: string }): string {
   return cn(
-    'w-full min-w-0 rounded-md border bg-surface px-3 text-body text-ink',
+    'w-full max-w-full min-w-0 rounded-md border bg-surface px-3 text-body text-ink',
     'transition-colors duration-micro placeholder:text-ink-muted',
     'hover:border-ink-muted',
     'disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-muted',
